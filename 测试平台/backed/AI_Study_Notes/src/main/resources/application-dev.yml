@@ -1,0 +1,26 @@
+example.ai_study_notes:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    host: localhost
+    port: 3306
+    database: app_test
+    username: root
+    password: 123456
+  redis:
+    druid:
+    host: 127.0.0.1
+    port: 6379
+    password:
+    database: 0
+    timeout: 3000
+    ttl: 300
+
+task:
+  scheduler:
+    enable:
+      accessUserInfo: false   #控制定时任务开启
+      collectECSMetricInfo: true
+  cron:
+    accessUserInfo: 0 */5 * * * *
+    collectESCMetricInfo: 10000
+  scope:

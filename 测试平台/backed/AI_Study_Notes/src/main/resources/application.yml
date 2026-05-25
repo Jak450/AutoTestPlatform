@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  main:
+    allow-circular-references: true
+  datasource:
+    driver-class-name: ${example.ai_study_notes.datasource.driver-class-name}
+    url: jdbc:mysql://${example.ai_study_notes.datasource.host}:${example.ai_study_notes.datasource.port}/${example.ai_study_notes.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${example.ai_study_notes.datasource.username}
+    password: ${example.ai_study_notes.datasource.password}
+    type: com.alibaba.druid.pool.DruidDataSource
+  redis:
+    host: ${example.ai_study_notes.redis.host}
+    port: ${example.ai_study_notes.redis.port}
+    database: ${example.ai_study_notes.redis.database}
+    timeout: ${example.ai_study_notes.redis.timeout}
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml  # Mapper XML 文件路径
+  type-aliases-package: example.ai_study_notes.Pojo.entity   # 实体类别名包路径
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印 SQL 日志（调试用）
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto

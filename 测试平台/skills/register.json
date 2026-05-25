@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "description": "自动化测试平台技能注册表",
+  "skills": [
+    {
+      "name": "doc-parser-markdown",
+      "formats": [".md", ".mdx"],
+      "description": "解析 Markdown 格式的需求文档",
+      "enabled": true
+    },
+    {
+      "name": "doc-parser-pdf",
+      "formats": [".pdf"],
+      "description": "解析 PDF 格式的需求文档",
+      "enabled": true
+    },
+    {
+      "name": "doc-parser-word",
+      "formats": [".doc", ".docx"],
+      "description": "解析 Word 格式的需求文档",
+      "enabled": true
+    },
+    {
+      "name": "test-case-generator-api",
+      "formats": [],
+      "description": "根据需求文档生成 API 测试用例，输出符合 use_case 表 schema 的 JSON",
+      "enabled": true
+    },
+    {
+      "name": "test-case-generator-ui",
+      "formats": [],
+      "description": "根据需求文档生成 UI 测试用例（预留，后续实现）",
+      "enabled": false
+    },
+    {
+      "name": "test-result-analyzer",
+      "formats": [],
+      "description": "分析测试执行结果，诊断失败根因",
+      "enabled": false
+    }
+  ]
+}
