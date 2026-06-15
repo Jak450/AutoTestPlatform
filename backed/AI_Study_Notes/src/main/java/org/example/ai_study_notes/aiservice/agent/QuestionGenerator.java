@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.aiservice.client.AIClient;
+import org.example.ai_study_notes.aiservice.client.AIModelConfig;
 import org.example.ai_study_notes.aiservice.context.DocContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,9 @@ public class QuestionGenerator {
             """;
 
     @Autowired
+    private AIModelConfig aiModelConfig;
+
+    @Autowired
     private AIClient aiClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -49,7 +53,7 @@ public class QuestionGenerator {
                 + context.buildQAPrompt();
 
         String result = aiClient.chat(
-                "deepseek-v4-flash",
+                aiModelConfig.getQuestionGeneration(),
                 SYSTEM_PROMPT,
                 prompt
         );

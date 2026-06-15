@@ -8,7 +8,8 @@
 # To add a new secret value, append a line to .secrets.local:
 #   SECRET_NAME=real_value_here
 
-backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/aiservice/client/AIModelConfig.java filter=secrets
-backed/**/application*.yml filter=secrets
-backed/**/application*.yaml filter=secrets
-backed/**/application*.properties filter=secrets
+backed/**/application-dev.yml filter=secrets
+
+# Example for future use (uncomment when needed):
+# backed/**/.env filter=secrets
+# backed/**/docker-compose*.yml filter=secrets

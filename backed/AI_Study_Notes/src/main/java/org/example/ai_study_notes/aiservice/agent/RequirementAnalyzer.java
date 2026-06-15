@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.aiservice.client.AIClient;
+import org.example.ai_study_notes.aiservice.client.AIModelConfig;
 import org.example.ai_study_notes.aiservice.context.DocContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,9 @@ public class RequirementAnalyzer {
             """;
 
     @Autowired
+    private AIModelConfig aiModelConfig;
+
+    @Autowired
     private AIClient aiClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -47,7 +51,7 @@ public class RequirementAnalyzer {
         }
 
         String result = aiClient.chat(
-                "doubao-seed-2.0-pro",
+                aiModelConfig.getRequirementAnalysis(),
                 SYSTEM_PROMPT,
                 userPrompt
         );

@@ -15,6 +15,16 @@ example.ai_study_notes:
     timeout: 3000
     ttl: 300
 
+ai:
+  ark:
+    base-url: https://ark.cn-beijing.volces.com/api/coding/v3
+    api-key: <your ARK_API_KEY>  # @secret ARK_API_KEY
+    doc-parser: deepseek-v4-flash
+    requirement-analysis: doubao-seed-2.0-pro
+    question-generation: deepseek-v4-flash
+    test-case-generation: doubao-seed-code
+    result-analysis: deepseek-v4-pro
+
 task:
   scheduler:
     enable:

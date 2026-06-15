@@ -1,15 +1,31 @@
-﻿package org.example.ai_study_notes.aiservice.client;
+package org.example.ai_study_notes.aiservice.client;
 
+import lombok.Getter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Getter
+@Component
 public class AIModelConfig {
 
-    private AIModelConfig() {}
+    @Value("${ai.ark.doc-parser:deepseek-v4-flash}")
+    private String docParser;
 
-    public static final String DOC_PARSER = "deepseek-v4-flash";
-    public static final String REQUIREMENT_ANALYSIS = "doubao-seed-2.0-pro";
-    public static final String QUESTION_GENERATION = "deepseek-v4-flash";
-    public static final String TEST_CASE_GENERATION = "doubao-seed-code";
-    public static final String RESULT_ANALYSIS = "deepseek-v4-pro";
+    @Value("${ai.ark.requirement-analysis:doubao-seed-2.0-pro}")
+    private String requirementAnalysis;
 
-    public static final String BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3";
-    public static final String API_KEY = "<your ARK_API_KEY>"; // @secret ARK_API_KEY
+    @Value("${ai.ark.question-generation:deepseek-v4-flash}")
+    private String questionGeneration;
+
+    @Value("${ai.ark.test-case-generation:doubao-seed-code}")
+    private String testCaseGeneration;
+
+    @Value("${ai.ark.result-analysis:deepseek-v4-pro}")
+    private String resultAnalysis;
+
+    @Value("${ai.ark.base-url:https://ark.cn-beijing.volces.com/api/coding/v3}")
+    private String baseUrl;
+
+    @Value("${ai.ark.api-key}")
+    private String apiKey;
 }

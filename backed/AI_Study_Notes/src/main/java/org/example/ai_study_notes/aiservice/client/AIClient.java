@@ -1,8 +1,6 @@
 package org.example.ai_study_notes.aiservice.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Builder;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +16,12 @@ import java.util.Map;
 @Service
 public class AIClient {
 
+    private final AIModelConfig config;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public AIClient(AIModelConfig config) {
+        this.config = config;
+    }
 
     public String chat(String model, String systemPrompt, String userMessage) {
         List<Map<String, String>> messages = new ArrayList<>();
@@ -29,11 +32,11 @@ public class AIClient {
 
     public String chatWithHistory(String model, List<Map<String, String>> messages) {
         try {
-            URI uri = new URI(AIModelConfig.BASE_URL + "/chat/completions");
+            URI uri = new URI(config.getBaseUrl() + "/chat/completions");
             HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + AIModelConfig.API_KEY);
+            conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
             conn.setDoOutput(true);
             conn.setConnectTimeout(60000);
             conn.setReadTimeout(120000);

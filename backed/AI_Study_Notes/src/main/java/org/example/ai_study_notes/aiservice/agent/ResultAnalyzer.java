@@ -3,6 +3,7 @@ package org.example.ai_study_notes.aiservice.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.aiservice.client.AIClient;
+import org.example.ai_study_notes.aiservice.client.AIModelConfig;
 import org.example.ai_study_notes.mapper.TestCaseReportMapper;
 import org.example.ai_study_notes.Pojo.entity.TestCaseReport;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,9 @@ public class ResultAnalyzer {
               "confidence": "high|medium|low"
             }
             """;
+
+    @Autowired
+    private AIModelConfig aiModelConfig;
 
     @Autowired
     private AIClient aiClient;
@@ -86,7 +90,7 @@ public class ResultAnalyzer {
                 safe(report.getAssertDetail())
         );
 
-        return aiClient.chat("deepseek-v4-pro", SYSTEM_PROMPT, prompt);
+        return aiClient.chat(aiModelConfig.getResultAnalysis(), SYSTEM_PROMPT, prompt);
     }
 
     private String safe(String s) {

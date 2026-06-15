@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.aiservice.client.AIClient;
+import org.example.ai_study_notes.aiservice.client.AIModelConfig;
 import org.example.ai_study_notes.aiservice.context.DocContext;
 import org.example.ai_study_notes.aiservice.skill.SkillLoader;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,9 @@ import java.util.Map;
 @Slf4j
 @Component
 public class ApiTestCaseGenerator implements TestCaseGenerator {
+
+    @Autowired
+    private AIModelConfig aiModelConfig;
 
     @Autowired
     private AIClient aiClient;
@@ -48,7 +52,7 @@ public class ApiTestCaseGenerator implements TestCaseGenerator {
         userPrompt += "\n\n请严格按照 SKILL.md 的格式输出 JSON 数组。";
 
         String result = aiClient.chat(
-                "doubao-seed-code",
+                aiModelConfig.getTestCaseGeneration(),
                 skill.getContent(),
                 userPrompt
         );

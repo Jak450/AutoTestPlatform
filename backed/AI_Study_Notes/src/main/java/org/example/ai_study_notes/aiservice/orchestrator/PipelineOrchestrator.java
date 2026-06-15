@@ -7,6 +7,7 @@ import org.example.ai_study_notes.aiservice.agent.QuestionGenerator;
 import org.example.ai_study_notes.aiservice.agent.RequirementAnalyzer;
 import org.example.ai_study_notes.aiservice.agent.ResultAnalyzer;
 import org.example.ai_study_notes.aiservice.client.AIClient;
+import org.example.ai_study_notes.aiservice.client.AIModelConfig;
 import org.example.ai_study_notes.aiservice.context.DocContext;
 import org.example.ai_study_notes.aiservice.generator.TestCaseGenerator;
 import org.example.ai_study_notes.aiservice.skill.SkillLoader;
@@ -19,6 +20,9 @@ import java.util.Map;
 @Slf4j
 @Service
 public class PipelineOrchestrator {
+
+    @Autowired
+    private AIModelConfig aiModelConfig;
 
     @Autowired
     private SkillLoader skillLoader;
@@ -59,7 +63,7 @@ public class PipelineOrchestrator {
 
         log.info("Pipeline Step 1: 文档解析 - 使用 skill: {}", skillName);
         String parsedDoc = aiClient.chat(
-                "deepseek-v4-flash",
+                aiModelConfig.getDocParser(),
                 skill.getContent(),
                 "请解析以下需求文档，严格按照 SKILL.md 的输出格式返回 JSON：\n\n" + context.getRawContent()
         );
