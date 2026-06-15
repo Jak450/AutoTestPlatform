@@ -1,4 +1,4 @@
-package org.example.ai_study_notes.aiservice.client;
+﻿package org.example.ai_study_notes.aiservice.client;
 
 public class AIModelConfig {
 
@@ -11,5 +11,5 @@ public class AIModelConfig {
     public static final String RESULT_ANALYSIS = "deepseek-v4-pro";
 
     public static final String BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3";
-    public static final String API_KEY = "<your API KEY>";
+    public static final String API_KEY = "<your ARK_API_KEY>"; // @secret ARK_API_KEY
 }

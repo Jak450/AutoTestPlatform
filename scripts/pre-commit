@@ -1,0 +1,29 @@
+#!/bin/sh
+# pre-commit - last line of defence: scan staged diff for known secret patterns
+# that are NOT registered in .secrets.local. Aborts commit on hit.
+#
+# Installed by scripts/secrets-install.ps1 to .git/hooks/pre-commit
+
+set -e
+
+# Run via PowerShell so we can reuse Windows-native patterns.
+# Fallback: if pwsh missing, do a minimal grep check.
+
+REPO=$(git rev-parse --show-toplevel)
+if command -v pwsh >/dev/null 2>&1; then
+    pwsh -NoProfile -ExecutionPolicy Bypass -File "$REPO/scripts/pre-commit-scan.ps1"
+    exit $?
+elif command -v powershell >/dev/null 2>&1; then
+    powershell -NoProfile -ExecutionPolicy Bypass -File "$REPO/scripts/pre-commit-scan.ps1"
+    exit $?
+fi
+
+# Minimal POSIX fallback
+PATTERNS='(ark-[a-f0-9-]{30,})|(sk-[a-zA-Z0-9]{32,})|(AKIA[0-9A-Z]{16})|(ghp_[A-Za-z0-9]{36})'
+if git diff --cached -U0 | grep -E "^\+" | grep -E "$PATTERNS" >/dev/null 2>&1; then
+    echo "ERROR: pre-commit detected a secret-like pattern in staged changes."
+    echo "       Add it to .secrets.local so the filter can scrub it,"
+    echo "       or replace it with a <your KEY> placeholder."
+    exit 1
+fi
+exit 0

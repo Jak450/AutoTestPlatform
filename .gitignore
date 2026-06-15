@@ -1,0 +1,10 @@
+# Local secrets registry - NEVER commit
+.secrets.local
+*.secrets.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
