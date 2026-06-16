@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.controller.ApiTest;
 
 import org.example.ai_study_notes.Aop.anno.ApiTest;
+import org.example.ai_study_notes.Aop.anno.Idempotent;
 import org.example.ai_study_notes.Pojo.dto.ApiRequestDTO;
 import org.example.ai_study_notes.Pojo.dto.BatchDTO;
 import org.example.ai_study_notes.Pojo.dto.BatchExecuteDTO;
@@ -26,6 +27,7 @@ public class BatchTestController {
 
 
     @PostMapping("/execute")
+    @Idempotent
     @ApiTest(name = "接口测试",module = "批量执行",description = "并发执行多个接口测试用例")
     public BatchExecuteResultVO batchExecute(@RequestBody BatchExecuteDTO batchExecuteDTO) {
         return apiTestService.batchExecute(batchExecuteDTO);

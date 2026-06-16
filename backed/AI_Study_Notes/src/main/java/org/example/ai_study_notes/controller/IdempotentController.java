@@ -20,7 +20,6 @@ public class IdempotentController {
     @GetMapping("/token")
     public Result<String> getToken() {
         String token = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set("idempotent:" + token, "pending", Duration.ofSeconds(60));
         return Result.success(token);
     }
 }

@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.controller.UITest;
 
 
+import org.example.ai_study_notes.Aop.anno.Idempotent;
 import org.example.ai_study_notes.Pojo.Result;
 import org.example.ai_study_notes.Pojo.dto.BatchExecuteDTO;
 import org.example.ai_study_notes.Pojo.vo.UiVO.UiBatchExecuteResultVO;
@@ -19,6 +20,7 @@ public class UIBatchTestController {
 private UiTestService uiTestService;
 
     @PostMapping("ui-batch-test")
+    @Idempotent
     public UiBatchExecuteResultVO BatchTest(@RequestBody BatchExecuteDTO batchExecuteDTO)
     {
         return uiTestService.batchTest(batchExecuteDTO);
