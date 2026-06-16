@@ -1,3 +1,8 @@
+---
+name: doc-parser-markdown
+description: 解析 Markdown 格式的需求文档，提取结构化信息（功能点、接口、字段等）并输出 JSON
+---
+
 # Skill: Doc Parser - Markdown
 
 ## 描述

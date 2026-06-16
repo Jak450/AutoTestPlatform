@@ -1,3 +1,9 @@
+---
+name: test-case-generator-ui
+description: 根据已解析的需求 JSON 生成 UI 自动化测试用例（预留，尚未实现）
+enabled: false
+---
+
 # Skill: Test Case Generator - UI (预留)
 
 ## 描述

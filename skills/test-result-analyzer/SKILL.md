@@ -1,3 +1,9 @@
+---
+name: test-result-analyzer
+description: 分析测试执行结果，诊断失败根因（预留，尚未实现）
+enabled: false
+---
+
 # Skill: Test Result Analyzer (预留)
 
 ## 描述

@@ -55,6 +55,19 @@
         </el-form>
       </div>
 
+      <!-- 分析进度 -->
+      <div v-if="analyzing" class="progress-section">
+        <el-steps :active="progressStep" align-center finish-status="success" process-status="process">
+          <el-step title="解析文档" :description="progressDesc.parsing" />
+          <el-step title="需求分析" :description="progressDesc.analyzing" />
+          <el-step title="生成问题" :description="progressDesc.generating_questions" />
+        </el-steps>
+        <div v-if="streamContent" class="stream-output">
+          <div class="stream-label">{{ streamStageLabel }}</div>
+          <pre class="stream-text">{{ streamContent }}</pre>
+        </div>
+      </div>
+
       <!-- Step 2: Q&A 交互 -->
       <div v-if="step === 2" class="step-section">
         <div class="section-title">第二步：回答澄清问题</div>
@@ -70,7 +83,7 @@
             <el-tag size="small" type="warning">Q{{ index + 1 }}</el-tag>
             <span style="margin-left: 8px;">{{ q.question }}</span>
           </div>
-          <div v-if="q.options" class="qa-options">
+          <div v-if="q.options && q.options.length > 0" class="qa-options">
             <el-radio-group v-model="qaAnswers[index]" @change="qaInputs[index] = qaAnswers[index]">
               <el-radio v-for="opt in q.options" :key="opt" :value="opt" class="qa-radio">
                 {{ opt }}
@@ -154,6 +167,18 @@ export default {
     const generatedCases = ref([])
     const caseCount = ref(0)
 
+    const progressStep = ref(0)
+    const progressDesc = ref({ parsing: '', analyzing: '', generating_questions: '' })
+    const streamContent = ref('')
+    const streamStageLabel = ref('')
+    const currentStage = ref('')
+
+    const stageLabels = {
+      parsing: '文档解析中...',
+      analyzing: '需求分析中...',
+      generating_questions: '生成澄清问题中...'
+    }
+
     onMounted(async () => {
       try {
         const res = await axios.get('/projects')
@@ -183,27 +208,96 @@ export default {
         return
       }
       analyzing.value = true
+      progressStep.value = 0
+      streamContent.value = ''
+      progressDesc.value = { parsing: '', analyzing: '', generating_questions: '' }
+
       try {
         const text = await uploadFile.value.text()
-        const res = await axios.post('/ai/analyze-requirement', {
-          fileName: uploadFile.value.name,
-          content: text,
-          projectId: projectId.value
+        const response = await fetch('/api/ai/analyze-requirement-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: uploadFile.value.name,
+            content: text,
+            projectId: projectId.value
+          })
         })
-        const data = res.data.data
-        sessionId.value = data.sessionId
-        questions.value = data.questions || []
-        canGenerate.value = data.canGenerate || false
-        qaAnswers.value = []
-        qaInputs.value = []
-        step.value = 2
-        if (!canGenerate.value && (!questions.value || questions.value.length === 0)) {
-          ElMessage.warning('AI 分析完成，但未生成澄清问题，可能需求信息不足')
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const data = line.substring(5).trim()
+              try {
+                const event = JSON.parse(data)
+                handleStreamEvent(event)
+              } catch (_) {}
+            }
+          }
         }
       } catch (e) {
-        ElMessage.error('分析失败: ' + (e.response?.data?.msg || e.message))
+        ElMessage.error('分析失败: ' + e.message)
       } finally {
         analyzing.value = false
+      }
+    }
+
+    const handleStreamEvent = (event) => {
+      switch (event.type) {
+        case 'stage':
+          currentStage.value = event.stage
+          streamStageLabel.value = stageLabels[event.stage] || event.message
+          streamContent.value = ''
+
+          if (event.stage === 'parsing') {
+            progressStep.value = 0
+            progressDesc.value.parsing = '进行中...'
+          } else if (event.stage === 'analyzing') {
+            progressStep.value = 1
+            progressDesc.value.parsing = '完成'
+            progressDesc.value.analyzing = '进行中...'
+          } else if (event.stage === 'generating_questions') {
+            progressStep.value = 2
+            progressDesc.value.analyzing = '完成'
+            progressDesc.value.generating_questions = '进行中...'
+          }
+          break
+
+        case 'token':
+          streamContent.value += event.content
+          break
+
+        case 'done':
+          progressStep.value = 3
+          progressDesc.value.generating_questions = '完成'
+          questions.value = event.questions || []
+          canGenerate.value = event.canGenerate || false
+          qaAnswers.value = []
+          qaInputs.value = []
+          step.value = 2
+          if (!canGenerate.value && (!questions.value || questions.value.length === 0)) {
+            ElMessage.warning('AI 分析完成，但未生成澄清问题，可能需求信息不足')
+          }
+          break
+
+        case 'session':
+          sessionId.value = event.sessionId
+          break
+
+        case 'error':
+          ElMessage.error('分析失败: ' + event.message)
+          break
       }
     }
 
@@ -272,6 +366,9 @@ export default {
       generatedCases.value = []
       uploadFile.value = null
       canGenerate.value = false
+      progressStep.value = 0
+      streamContent.value = ''
+      progressDesc.value = { parsing: '', analyzing: '', generating_questions: '' }
     }
 
     const methodTag = (m) => {
@@ -282,6 +379,7 @@ export default {
     return {
       step, projects, projectId, uploadFile, uploadFileName, fileInputRef, analyzing, submitting, generating, saving,
       sessionId, questions, qaAnswers, qaInputs, canGenerate, generatedCases, caseCount,
+      progressStep, progressDesc, streamContent, streamStageLabel,
       handleFileChange, startAnalysis, submitAnswers, generateCases, saveCases, reset, methodTag, selectFile
     }
   }
@@ -299,4 +397,9 @@ export default {
 .qa-question { font-weight: 500; margin-bottom: 8px; display: flex; align-items: center; }
 .qa-options { margin: 8px 0; }
 .qa-radio { display: block; margin: 4px 0; }
+
+.progress-section { margin: 20px 0; }
+.stream-output { margin-top: 16px; background: #1e1e1e; border-radius: 8px; padding: 12px; }
+.stream-label { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
+.stream-text { color: #c9d1d9; font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
 </style>
