@@ -142,7 +142,7 @@ public class AIController {
     }
 
     @PostMapping("/analyze-result/{reportId}")
-    public Result<String> analyzeResult(@PathVariable Integer reportId) {
+    public Result<String> analyzeResult(@PathVariable("reportId") Integer reportId) {
         try {
             String analysis = orchestrator.analyzeResult(null, reportId);
             return Result.<String>success(analysis);

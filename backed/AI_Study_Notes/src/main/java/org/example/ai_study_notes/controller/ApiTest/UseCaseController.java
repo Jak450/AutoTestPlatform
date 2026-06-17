@@ -27,7 +27,7 @@ public class UseCaseController {
 
 
     @PutMapping("/{id}")
-    public Result updateUseCase(@PathVariable Integer id, @RequestBody UseCase useCase) {
+    public Result updateUseCase(@PathVariable("id") Integer id, @RequestBody UseCase useCase) {
 
 
        useCaseService.updateUseCase(useCase);
@@ -35,7 +35,7 @@ public class UseCaseController {
     }
 
     @GetMapping("/{id}")
-    public UseCase getUseCaseById(@PathVariable Integer id) {
+    public UseCase getUseCaseById(@PathVariable("id") Integer id) {
 
 
         UseCase useCaseUpdateVO=useCaseService.getUseCasesById(id);
@@ -52,7 +52,7 @@ public class UseCaseController {
     }
 
     @DeleteMapping("/{id}")
-    public Result deleteUseCase(@PathVariable Integer id)
+    public Result deleteUseCase(@PathVariable("id") Integer id)
     {
 
 

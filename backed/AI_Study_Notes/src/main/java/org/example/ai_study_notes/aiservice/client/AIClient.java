@@ -1,18 +1,25 @@
 package org.example.ai_study_notes.aiservice.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -20,59 +27,29 @@ import java.util.function.Consumer;
 public class AIClient {
 
     private final AIModelConfig config;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, ChatModel> chatModelCache = new ConcurrentHashMap<>();
+    private final Map<String, StreamingChatModel> streamingModelCache = new ConcurrentHashMap<>();
 
     public AIClient(AIModelConfig config) {
         this.config = config;
     }
 
     public String chat(String model, String systemPrompt, String userMessage) {
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt));
-        messages.add(Map.of("role", "user", "content", userMessage));
-        return chatWithHistory(model, messages);
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(SystemMessage.from(systemPrompt));
+        messages.add(UserMessage.from(userMessage));
+        return doChat(model, messages);
     }
 
-    public String chatWithHistory(String model, List<Map<String, String>> messages) {
+    public String chatWithHistory(String model, List<Map<String, String>> rawMessages) {
+        return doChat(model, convertMessages(rawMessages));
+    }
+
+    private String doChat(String model, List<ChatMessage> messages) {
+        ChatModel chatModel = getOrCreateChatModel(model);
         try {
-            URI uri = new URI(config.getBaseUrl() + "/chat/completions");
-            HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(60000);
-            conn.setReadTimeout(120000);
-
-            Map<String, Object> requestBody = Map.of(
-                    "model", model,
-                    "messages", messages,
-                    "max_tokens", 4096,
-                    "temperature", 0.3
-            );
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(objectMapper.writeValueAsBytes(requestBody));
-                os.flush();
-            }
-
-            int status = conn.getResponseCode();
-            if (status != 200) {
-                String error = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-                log.error("AI API error [{}]: {}", status, error);
-                throw new RuntimeException("AI API call failed: " + status);
-            }
-
-            String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            Map<String, Object> result = objectMapper.readValue(response, Map.class);
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) result.get("choices");
-            if (choices == null || choices.isEmpty()) {
-                throw new RuntimeException("AI API returned empty choices");
-            }
-            Map<String, Object> firstChoice = choices.get(0);
-            Map<String, String> message = (Map<String, String>) firstChoice.get("message");
-            return message.get("content");
-
+            ChatResponse response = chatModel.chat(messages);
+            return response.aiMessage().text();
         } catch (Exception e) {
             log.error("AI client error with model {}: {}", model, e.getMessage(), e);
             throw new RuntimeException("AI call failed: " + e.getMessage(), e);
@@ -80,76 +57,82 @@ public class AIClient {
     }
 
     public String chatStream(String model, String systemPrompt, String userMessage, Consumer<String> onToken) {
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt));
-        messages.add(Map.of("role", "user", "content", userMessage));
-        return chatStreamWithHistory(model, messages, onToken);
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(SystemMessage.from(systemPrompt));
+        messages.add(UserMessage.from(userMessage));
+        return doChatStream(model, messages, onToken);
     }
 
-    public String chatStreamWithHistory(String model, List<Map<String, String>> messages, Consumer<String> onToken) {
+    public String chatStreamWithHistory(String model, List<Map<String, String>> rawMessages, Consumer<String> onToken) {
+        return doChatStream(model, convertMessages(rawMessages), onToken);
+    }
+
+    private String doChatStream(String model, List<ChatMessage> messages, Consumer<String> onToken) {
+        StreamingChatModel streamingModel = getOrCreateStreamingModel(model);
+        StringBuilder fullContent = new StringBuilder();
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        streamingModel.chat(messages, new StreamingChatResponseHandler() {
+            @Override
+            public void onPartialResponse(String partialResponse) {
+                fullContent.append(partialResponse);
+                onToken.accept(partialResponse);
+            }
+
+            @Override
+            public void onCompleteResponse(ChatResponse completeResponse) {
+                future.complete(null);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                future.completeExceptionally(error);
+            }
+        });
+
         try {
-            URI uri = new URI(config.getBaseUrl() + "/chat/completions");
-            HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + config.getApiKey());
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(60000);
-            conn.setReadTimeout(300000);
-
-            Map<String, Object> requestBody = new java.util.LinkedHashMap<>();
-            requestBody.put("model", model);
-            requestBody.put("messages", messages);
-            requestBody.put("max_tokens", 4096);
-            requestBody.put("temperature", 0.3);
-            requestBody.put("stream", true);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(objectMapper.writeValueAsBytes(requestBody));
-                os.flush();
-            }
-
-            int status = conn.getResponseCode();
-            if (status != 200) {
-                String error = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-                log.error("AI API error [{}]: {}", status, error);
-                throw new RuntimeException("AI API call failed: " + status);
-            }
-
-            StringBuilder fullContent = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data: ")) {
-                        String data = line.substring(6).trim();
-                        if ("[DONE]".equals(data)) {
-                            break;
-                        }
-                        try {
-                            Map<String, Object> chunk = objectMapper.readValue(data, Map.class);
-                            List<Map<String, Object>> choices = (List<Map<String, Object>>) chunk.get("choices");
-                            if (choices != null && !choices.isEmpty()) {
-                                Map<String, Object> delta = (Map<String, Object>) choices.get(0).get("delta");
-                                if (delta != null && delta.containsKey("content")) {
-                                    String token = (String) delta.get("content");
-                                    if (token != null) {
-                                        fullContent.append(token);
-                                        onToken.accept(token);
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            log.debug("Skip unparseable SSE line: {}", data);
-                        }
-                    }
-                }
-            }
-
-            return fullContent.toString();
-
+            future.get(300, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("AI stream error with model {}: {}", model, e.getMessage(), e);
             throw new RuntimeException("AI stream failed: " + e.getMessage(), e);
         }
+
+        return fullContent.toString();
+    }
+
+    private List<ChatMessage> convertMessages(List<Map<String, String>> rawMessages) {
+        List<ChatMessage> messages = new ArrayList<>();
+        for (Map<String, String> msg : rawMessages) {
+            String role = msg.get("role");
+            String content = msg.get("content");
+            switch (role) {
+                case "system" -> messages.add(SystemMessage.from(content));
+                case "user" -> messages.add(UserMessage.from(content));
+                case "assistant" -> messages.add(AiMessage.from(content));
+            }
+        }
+        return messages;
+    }
+
+    private ChatModel getOrCreateChatModel(String model) {
+        return chatModelCache.computeIfAbsent(model, m -> OpenAiChatModel.builder()
+                .apiKey(config.getApiKey())
+                .baseUrl(config.getBaseUrl())
+                .modelName(m)
+                .maxTokens(4096)
+                .temperature(0.3)
+                .timeout(Duration.ofSeconds(120))
+                .build());
+    }
+
+    private StreamingChatModel getOrCreateStreamingModel(String model) {
+        return streamingModelCache.computeIfAbsent(model, m -> OpenAiStreamingChatModel.builder()
+                .apiKey(config.getApiKey())
+                .baseUrl(config.getBaseUrl())
+                .modelName(m)
+                .maxTokens(4096)
+                .temperature(0.3)
+                .timeout(Duration.ofSeconds(300))
+                .build());
     }
 }

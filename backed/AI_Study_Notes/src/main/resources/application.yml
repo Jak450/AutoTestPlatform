@@ -4,8 +4,6 @@ server:
 spring:
   profiles:
     active: dev
-  main:
-    allow-circular-references: true
   datasource:
     driver-class-name: ${example.ai_study_notes.datasource.driver-class-name}
     url: jdbc:mysql://${example.ai_study_notes.datasource.host}:${example.ai_study_notes.datasource.port}/${example.ai_study_notes.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true

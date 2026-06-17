@@ -41,14 +41,14 @@ public class UIProjectController {
  }
 
  @PutMapping("/{id}")
-    public Result updateProject(@PathVariable int id, @RequestBody UIProject projectDTO) {
+    public Result updateProject(@PathVariable("id") int id, @RequestBody UIProject projectDTO) {
 
      projectService.updateProject(projectDTO);
      return Result.success();
  }
 
  @DeleteMapping("/{id}")
-    public Result deleteProject(@PathVariable Integer id) {
+    public Result deleteProject(@PathVariable("id") Integer id) {
 
 
      projectService.deleteProject(id);
