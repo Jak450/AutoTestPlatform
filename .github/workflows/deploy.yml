@@ -20,12 +20,6 @@ jobs:
       - name: Build Backend
         run: |
           cd backed/AI_Study_Notes
-          mvn install:install-file \
-            -Dfile=lib/selenium-server-4.18.1.jar \
-            -DgroupId=lib \
-            -DartifactId=selenium-server-4.18.1 \
-            -Dversion=1.0 \
-            -Dpackaging=jar
           mvn clean package -DskipTests -q
           cp target/*.jar ../../app.jar
 

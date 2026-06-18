@@ -122,12 +122,11 @@
             <version>1.3.0</version>
         </dependency>
 
+        <!-- Selenium -->
         <dependency>
-            <groupId>lib</groupId>
-            <artifactId>selenium-server-4.18.1</artifactId>
-            <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/selenium-server-4.18.1.jar</systemPath>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>4.18.1</version>
         </dependency>
 
 <!--        <dependency>-->
@@ -190,7 +189,6 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <configuration>
-                    <includeSystemScope>true</includeSystemScope>
                     <mainClass>org.example.ai_study_notes.AiStudyNotesApplication</mainClass>
                 </configuration>
                 <executions>
