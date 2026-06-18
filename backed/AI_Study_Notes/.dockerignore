@@ -1,4 +1,0 @@
-target/
-!.mvn
-*.jar
-*.war

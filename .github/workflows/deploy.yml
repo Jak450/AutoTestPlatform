@@ -1,0 +1,89 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Build Backend
+        run: |
+          cd backed/AI_Study_Notes
+          mvn install:install-file \
+            -Dfile=lib/selenium-server-4.18.1.jar \
+            -DgroupId=lib \
+            -DartifactId=selenium-server-4.18.1 \
+            -Dversion=1.0 \
+            -Dpackaging=jar \
+            -DlocalRepositoryPath=/root/.m2/repository
+          mvn clean package -DskipTests -q
+          cp target/*.jar ../../app.jar
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build Frontend
+        run: |
+          cd AutoTest_fronted
+          npm install
+          npm run build
+          cp -r dist ../dist
+
+      - name: Deploy to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "app.jar,dist"
+          target: /opt/autotest/
+          strip_components: 0
+
+      - name: Restart Backend
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # 停掉旧后端
+            kill $(cat /opt/autotest/app.pid 2>/dev/null) 2>/dev/null || true
+            sleep 2
+
+            # 启动新后端
+            cd /opt/autotest
+            nohup java -jar app.jar \
+              --spring.profiles.active=prod \
+              --DB_HOST=localhost \
+              --DB_PORT=3306 \
+              --DB_NAME=app_test \
+              --DB_USERNAME=root \
+              --DB_PASSWORD=123456 \
+              --REDIS_HOST=localhost \
+              --REDIS_PORT=6379 \
+              --ARK_API_KEY=${{ secrets.ARK_API_KEY }} \
+              > app.log 2>&1 &
+            echo $! > app.pid
+
+            # 检查是否启动成功
+            sleep 5
+            if kill -0 $(cat app.pid) 2>/dev/null; then
+              echo "Backend started successfully"
+            else
+              echo "Backend failed to start"
+              cat app.log
+              exit 1
+            fi
