@@ -190,6 +190,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <configuration>
+                    <includeSystemScope>true</includeSystemScope>
                     <mainClass>org.example.ai_study_notes.AiStudyNotesApplication</mainClass>
                 </configuration>
                 <executions>
