@@ -2,6 +2,9 @@
 .secrets.local
 *.secrets.local
 
+# Environment variables (contains API keys, passwords)
+.env
+
 # OS / IDE
 .DS_Store
 Thumbs.db

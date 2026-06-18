@@ -586,17 +586,10 @@ export default {
         console.log('执行次数:', executionCount.value)
         console.log('最大并发数:', maxConcurrency.value)
         
-        // 获取幂等性Token
-        const tokenRes = await axios.get('/idempotent/token')
-        const idempotentToken = tokenRes.data.data
-        
-        // 调用批量并发执行接口
         const response = await axios.post('/execute', {
           useCaseIds: useCaseIds,
           executionCount: executionCount.value,
           maxConcurrency: maxConcurrency.value
-        }, {
-          headers: { 'Idempotent-Token': idempotentToken }
         })
         
         const result = response.data

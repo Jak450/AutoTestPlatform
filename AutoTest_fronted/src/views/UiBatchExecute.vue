@@ -302,21 +302,13 @@ export default {
       showProgress.value = true
       
       try {
-        // 获取幂等性Token
-        const tokenRes = await axios.get('/idempotent/token')
-        const idempotentToken = tokenRes.data.data
-        
-        // 构建请求参数
         const requestData = {
           useCaseIds: selectedUseCases.value.map(useCase => useCase.id),
           executionCount: executionCount.value,
           maxConcurrency: maxConcurrency.value
         }
         
-        // 调用后端批量执行接口
-        const response = await axios.post('/ui-batch-test', requestData, {
-          headers: { 'Idempotent-Token': idempotentToken }
-        })
+        const response = await axios.post('/ui-batch-test', requestData)
         const result = response.data
         
         console.log('批量执行响应:', result)

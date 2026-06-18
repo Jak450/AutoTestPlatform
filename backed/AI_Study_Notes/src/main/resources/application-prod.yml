@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:app_test}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    type: com.alibaba.druid.pool.DruidDataSource
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    timeout: 3000
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: example.ai_study_notes.Pojo.entity
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+ai:
+  ark:
+    base-url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/coding/v3}
+    api-key: ${ARK_API_KEY:}
+    doc-parser: ${ARK_MODEL_DOC_PARSER:deepseek-v4-flash}
+    requirement-analysis: ${ARK_MODEL_REQUIREMENT_ANALYSIS:doubao-seed-2.0-pro}
+    question-generation: ${ARK_MODEL_QUESTION_GENERATION:deepseek-v4-flash}
+    test-case-generation: ${ARK_MODEL_TEST_CASE_GENERATION:doubao-seed-code}
+    result-analysis: ${ARK_MODEL_RESULT_ANALYSIS:deepseek-v4-pro}
