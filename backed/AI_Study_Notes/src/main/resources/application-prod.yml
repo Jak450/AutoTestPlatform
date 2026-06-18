@@ -16,6 +16,11 @@ spring:
     timeout: 3000
     ttl: 300
 
+example:
+  ai_study_notes:
+    redis:
+      ttl: 300
+
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: example.ai_study_notes.Pojo.entity
