@@ -14,6 +14,7 @@ spring:
     password: ${REDIS_PASSWORD:}
     database: 0
     timeout: 3000
+    ttl: 300
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml

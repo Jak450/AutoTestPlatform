@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   mysql:
     image: mysql:8.0
@@ -12,9 +10,7 @@ services:
       - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./backed/full_database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./backed/ui_use_cases_schema_mysql.sql:/docker-entrypoint-initdb.d/02-ui-schema.sql
-      - ./backed/test_case_report_schema_mysql.sql:/docker-entrypoint-initdb.d/03-report-schema.sql
+      - ./backed/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

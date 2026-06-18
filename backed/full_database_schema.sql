@@ -4,12 +4,6 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 创建数据库（如果不存在）
-CREATE DATABASE IF NOT EXISTS `test_platform` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- 使用创建的数据库
-USE `test_platform`;
-
 -- ======================================
 -- 测试用例执行结果表
 -- ======================================
