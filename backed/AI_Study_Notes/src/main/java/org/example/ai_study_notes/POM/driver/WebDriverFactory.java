@@ -13,10 +13,9 @@ import org.openqa.selenium.firefox.FirefoxOptions;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
-/**
- * 创建 WebDriver 的统一配置
- */
 public class WebDriverFactory {
 
     public static WebDriver create(UiTestCaseRequestDTO request) throws IOException {
@@ -27,10 +26,14 @@ public class WebDriverFactory {
         WebDriver driver;
         switch (browser) {
             case "firefox":
-                String firefox_driver =ReadProperties.getPropertyValue("gecko_driver");
+                String firefox_driver = ReadProperties.getPropertyValue("gecko_driver");
                 String firefox_path = ReadProperties.getPropertyValue("firefox_path");
-                System.setProperty("webdriver.gecko.driver", firefox_driver);
-                System.setProperty("webdriver.firefox.bin", firefox_path);
+                if (StringUtils.hasText(firefox_driver)) {
+                    System.setProperty("webdriver.gecko.driver", firefox_driver);
+                }
+                if (StringUtils.hasText(firefox_path)) {
+                    System.setProperty("webdriver.firefox.bin", firefox_path);
+                }
                 FirefoxOptions firefoxOptions = new FirefoxOptions();
                 if (headless) {
                     firefoxOptions.addArguments("-headless");
@@ -39,7 +42,9 @@ public class WebDriverFactory {
                 break;
             case "edge":
                 String edge_path = ReadProperties.getPropertyValue("edge_path");
-                System.setProperty("webdriver.edge.driver",edge_path);
+                if (StringUtils.hasText(edge_path)) {
+                    System.setProperty("webdriver.edge.driver", edge_path);
+                }
                 EdgeOptions edgeOptions = new EdgeOptions();
                 if (headless) {
                     edgeOptions.addArguments("--headless=new");
@@ -49,7 +54,9 @@ public class WebDriverFactory {
             case "chrome":
             default:
                 String chrome_path = ReadProperties.getPropertyValue("chrome_path");
-                System.setProperty("webdriver.chrome.driver",chrome_path);
+                if (StringUtils.hasText(chrome_path) && Files.exists(Paths.get(chrome_path))) {
+                    System.setProperty("webdriver.chrome.driver", chrome_path);
+                }
                 ChromeOptions chromeOptions = new ChromeOptions();
                 if (headless) {
                     chromeOptions.addArguments("--headless=new");
