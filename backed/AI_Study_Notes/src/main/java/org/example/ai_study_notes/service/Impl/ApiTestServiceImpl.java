@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.service.Impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.methods.*;
 import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -45,6 +46,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 public class ApiTestServiceImpl implements ApiTestService {
 
@@ -133,7 +135,7 @@ public class ApiTestServiceImpl implements ApiTestService {
             responseVO.setAssertResults(assertResults);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("API 测试执行异常", e);
             // 处理异常情况
             resultMap.put("error", e.getMessage());
             responseVO.setResult(resultMap);
@@ -152,7 +154,7 @@ public class ApiTestServiceImpl implements ApiTestService {
                 try {
                     httpResponse.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.error("关闭 HTTP 响应失败", e);
                 }
             }
             // 注意：不再关闭共享的httpClient，它会在应用关闭时自动关闭
@@ -429,7 +431,7 @@ public class ApiTestServiceImpl implements ApiTestService {
                                 .duration(taskDuration)
                                 .build();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        log.error("批量执行单条用例失败", e);
                         return BatchExecuteResultVO.ExecuteDetailVO.builder()
                                 .useCaseId(finalUseCase.getId())
                                 .useCaseName(finalUseCase.getName())
@@ -451,7 +453,7 @@ public class ApiTestServiceImpl implements ApiTestService {
         // 等待所有任务完成并收集结果
         List<CompletableFuture<BatchExecuteResultVO.ExecuteDetailVO>> allFutures = 
                 futures.stream().map(f -> f.exceptionally(ex -> {
-                    ex.printStackTrace();
+                    log.error("API 批量执行任务异常", ex);
                     // 异常情况下返回失败结果（内部已处理异常，这里只是兜底）
                     return BatchExecuteResultVO.ExecuteDetailVO.builder()
                             .success(false)
@@ -478,7 +480,7 @@ public class ApiTestServiceImpl implements ApiTestService {
                     failedCount++;
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("批量执行汇总失败", e);
                 failedCount++;
             }
         }

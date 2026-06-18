@@ -8,13 +8,13 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
     type: com.alibaba.druid.pool.DruidDataSource
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD:}
-    database: 0
-    timeout: 3000
-    ttl: 300
+  data:
+    redis:
+      password: ${REDIS_PASSWORD:}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 3000
+      host: ${REDIS_HOST:localhost}
 
 example:
   ai_study_notes:
@@ -25,7 +25,7 @@ mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: example.ai_study_notes.Pojo.entity
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
     map-underscore-to-camel-case: true
   global-config:
     db-config:
@@ -40,3 +40,18 @@ ai:
     question-generation: ${ARK_MODEL_QUESTION_GENERATION:deepseek-v4-flash}
     test-case-generation: ${ARK_MODEL_TEST_CASE_GENERATION:doubao-seed-code}
     result-analysis: ${ARK_MODEL_RESULT_ANALYSIS:deepseek-v4-pro}
+
+logging:
+  file:
+    name: /opt/autotest/logs/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      file-name-pattern: /opt/autotest/logs/app-%d{yyyy-MM-dd}.%i.log
+  pattern:
+    file: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  level:
+    root: INFO
+    org.example.ai_study_notes: DEBUG
+    org.example.ai_study_notes.mapper: DEBUG

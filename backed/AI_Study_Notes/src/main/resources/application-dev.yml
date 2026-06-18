@@ -33,3 +33,18 @@ task:
     accessUserInfo: 0 */5 * * * *
     collectESCMetricInfo: 10000
   scope:
+
+logging:
+  file:
+    name: logs/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      file-name-pattern: logs/app-%d{yyyy-MM-dd}.%i.log
+  pattern:
+    file: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  level:
+    root: INFO
+    org.example.ai_study_notes: DEBUG
+    org.example.ai_study_notes.mapper: DEBUG

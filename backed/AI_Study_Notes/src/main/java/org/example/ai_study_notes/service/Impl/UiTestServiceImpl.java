@@ -164,7 +164,7 @@ public class UiTestServiceImpl implements UiTestService {
                                 .duration(taskDuration)
                                 .build();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        log.error("UI 批量执行单条用例失败", e);
                         return UiBatchExecuteResultVO.ExecuteDetailVO.builder()
                                 .useCaseId(finalUseCase.getId())
                                 .useCaseName(finalUseCase.getName())
@@ -189,7 +189,7 @@ public class UiTestServiceImpl implements UiTestService {
         // 等待所有任务完成并收集结果
         List<CompletableFuture<UiBatchExecuteResultVO.ExecuteDetailVO>> allFutures =
                 futures.stream().map(f -> f.exceptionally(ex -> {
-                    ex.printStackTrace();
+                    log.error("UI 批量执行任务异常", ex);
                     // 异常情况下返回失败结果（内部已处理异常，这里只是兜底）
                     return UiBatchExecuteResultVO.ExecuteDetailVO.builder()
                             .success(false)
@@ -216,7 +216,7 @@ public class UiTestServiceImpl implements UiTestService {
                     failedCount++;
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("UI 批量执行汇总失败", e);
                 failedCount++;
             }
         }

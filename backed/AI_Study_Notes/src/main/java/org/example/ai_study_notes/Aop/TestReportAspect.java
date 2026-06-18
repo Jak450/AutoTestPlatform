@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.Aop;
 
 import io.qameta.allure.Allure;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -28,6 +29,7 @@ import java.util.Optional;
  * 生成Allure格式的测试报告数据。
  * </p>
  */
+@Slf4j
 @Aspect
 @Component
 public class TestReportAspect {
@@ -163,7 +165,7 @@ public class TestReportAspect {
                         responseVO, throwable, caseStartTime, caseEndTime);
             } catch (Exception e) {
                 // 单个用例报告记录失败不影响其他用例
-                e.printStackTrace();
+                log.error("记录测试报告失败", e);
             }
         }
     }

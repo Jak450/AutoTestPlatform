@@ -10,17 +10,18 @@ spring:
     username: ${example.ai_study_notes.datasource.username}
     password: ${example.ai_study_notes.datasource.password}
     type: com.alibaba.druid.pool.DruidDataSource
-  redis:
-    host: ${example.ai_study_notes.redis.host}
-    port: ${example.ai_study_notes.redis.port}
-    database: ${example.ai_study_notes.redis.database}
-    timeout: ${example.ai_study_notes.redis.timeout}
+  data:
+    redis:
+      host: ${example.ai_study_notes.redis.host}
+      timeout: ${example.ai_study_notes.redis.timeout}
+      database: ${example.ai_study_notes.redis.database}
+      port: ${example.ai_study_notes.redis.port}
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml  # Mapper XML 文件路径
   type-aliases-package: example.ai_study_notes.Pojo.entity   # 实体类别名包路径
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印 SQL 日志（调试用）
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl  # 走 SLF4J，日志写到文件
     map-underscore-to-camel-case: true
   global-config:
     db-config:
