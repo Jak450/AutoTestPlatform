@@ -1,0 +1,30 @@
+filebeat.inputs:
+  - type: filestream
+    id: autotest-app
+    enabled: true
+    paths:
+      - /var/log/autotest/app.log
+      - /var/log/autotest/app-*.log
+    parsers:
+      - multiline:
+          type: pattern
+          pattern: '^\d{4}-\d{2}-\d{2}'
+          negate: true
+          match: after
+    fields:
+      service: autotest
+      env: prod
+    fields_under_root: true
+
+output.elasticsearch:
+  hosts: ["123.57.138.249:9200"]
+  index: "autotest-%{+yyyy.MM.dd}"
+
+setup.ilm.enabled: false
+setup.template.name: "autotest"
+setup.template.pattern: "autotest-*"
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+
+logging.level: info

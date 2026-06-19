@@ -1,0 +1,14 @@
+services:
+  filebeat:
+    image: elastic/filebeat:8.11.0
+    container_name: filebeat
+    restart: always
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /opt/autotest/logs:/var/log/autotest:ro
+      - filebeat-data:/usr/share/filebeat/data
+    command: ["-e", "-strict.perms=false"]
+
+volumes:
+  filebeat-data:
