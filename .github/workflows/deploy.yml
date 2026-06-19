@@ -35,23 +35,39 @@ jobs:
           npm run build
           cp -r dist ../dist
 
+      - name: Prepare deploy artifacts
+        run: |
+          mkdir -p deploy-package
+          cp app.jar deploy-package/
+          cp -r dist deploy-package/
+          cp -r backed/AI_Study_Notes/elk deploy-package/
+
       - name: Deploy to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "app.jar,dist"
-          target: /opt/autotest/
-          strip_components: 0
+          source: "deploy-package/*"
+          target: /tmp/deploy-package
+          strip_components: 1
 
-      - name: Restart Backend
+      - name: Restart Backend & Filebeat
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            # 同步部署文件
+            mkdir -p /opt/autotest /opt/filebeat
+            cp /tmp/deploy-package/app.jar /opt/autotest/
+            rm -rf /opt/autotest/dist
+            cp -r /tmp/deploy-package/dist /opt/autotest/
+            cp /tmp/deploy-package/elk/docker-compose.yml /opt/filebeat/
+            cp /tmp/deploy-package/elk/filebeat.yml /opt/filebeat/
+            rm -rf /tmp/deploy-package
+
             # 停掉旧后端
             kill $(cat /opt/autotest/app.pid 2>/dev/null) 2>/dev/null || true
             sleep 2
@@ -71,12 +87,18 @@ jobs:
               > app.log 2>&1 &
             echo $! > app.pid
 
-            # 检查是否启动成功
+            # 重启 Filebeat（如果已部署）
+            cd /opt/filebeat
+            if [ -f docker-compose.yml ]; then
+              docker compose up -d
+            fi
+
+            # 检查后端是否启动成功
             sleep 5
-            if kill -0 $(cat app.pid) 2>/dev/null; then
+            if kill -0 $(cat /opt/autotest/app.pid) 2>/dev/null; then
               echo "Backend started successfully"
             else
               echo "Backend failed to start"
-              cat app.log
+              cat /opt/autotest/app.log
               exit 1
             fi
