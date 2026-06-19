@@ -12,7 +12,7 @@ filebeat.inputs:
           negate: true
           match: after
     fields:
-      service: autotest
+      app: autotest
       env: prod
     fields_under_root: true
 
