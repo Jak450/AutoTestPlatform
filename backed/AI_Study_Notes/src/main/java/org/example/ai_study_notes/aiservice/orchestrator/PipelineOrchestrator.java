@@ -89,7 +89,6 @@ public class PipelineOrchestrator {
         if (skillName == null) {
             throw new IllegalArgumentException("不支持的文件格式: " + fileName);
         }
-
         SkillLoader.SkillInfo skill = skillLoader.load(skillName);
         if (skill == null || !skill.isEnabled()) {
             throw new IllegalStateException("缺少解析 skill 或未启用: " + skillName);

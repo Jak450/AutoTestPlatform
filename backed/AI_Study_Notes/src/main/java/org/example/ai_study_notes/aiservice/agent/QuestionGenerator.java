@@ -74,7 +74,7 @@ public class QuestionGenerator {
 
         return parseResult(result);
     }
-
+//流式输出SSE
     public Map<String, Object> generateStream(DocContext context, Consumer<String> onToken) {
         String prompt = "请根据以下需求分析结果，生成需要向用户提出的澄清问题：\n\n"
                 + context.getAnalysisResult() + "\n\n"
