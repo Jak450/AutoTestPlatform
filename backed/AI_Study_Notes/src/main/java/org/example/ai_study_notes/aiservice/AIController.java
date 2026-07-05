@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.Pojo.Result;
 import org.example.ai_study_notes.Pojo.dto.AiRequirementDTO;
+import org.example.ai_study_notes.aiservice.agent.TestCaseAgent;
 import org.example.ai_study_notes.aiservice.context.DocContext;
 import org.example.ai_study_notes.aiservice.orchestrator.PipelineOrchestrator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,10 @@ public class AIController {
 
     @Autowired
     private SessionManager sessionManager;
+
+    @Autowired
+    private TestCaseAgent testCaseAgent;
+
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -149,6 +154,79 @@ public class AIController {
         } catch (Exception e) {
             log.error("结果分析失败", e);
             return Result.<String>error("结果分析失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/agent-analyze")
+    public Result<Map<String, Object>> agentAnalyze(@RequestBody AiRequirementDTO dto) {
+        try {
+            String userInput = "文件名: " + dto.getFileName() + "\n内容:\n" + dto.getContent();
+            Map<String, Object> agentResult = testCaseAgent.run(userInput, null);
+
+            if ("questions".equals(agentResult.get("type"))) {
+                DocContext context = new DocContext();
+                context.setFileName(dto.getFileName());
+                context.setProjectId(dto.getProjectId());
+                context.setRawContent(dto.getContent());
+                String sessionId = sessionManager.create(context);
+
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                result.put("sessionId", sessionId);
+                result.put("questions", agentResult.get("questions"));
+                result.put("canGenerate", false);
+                return Result.<Map<String, Object>>success(result);
+            } else if ("cases".equals(agentResult.get("type"))) {
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                result.put("questions", List.of());
+                result.put("canGenerate", true);
+                result.put("cases", agentResult.get("cases"));
+                return Result.<Map<String, Object>>success(result);
+            } else {
+                return Result.<Map<String, Object>>error("Agent 执行失败: " + agentResult.get("message"));
+            }
+        } catch (Exception e) {
+            log.error("Agent 分析失败", e);
+            return Result.<Map<String, Object>>error("Agent 分析失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/agent-generate")
+    public Result<Map<String, Object>> agentGenerate(
+            @RequestParam("sessionId") String sessionId,
+            @RequestBody List<Map<String, String>> answers) {
+        DocContext context = sessionManager.get(sessionId);
+        if (context == null) {
+            return Result.<Map<String, Object>>error("会话已过期，请重新上传");
+        }
+
+        try {
+            String userInput = "文件名: " + context.getFileName() + "\n内容:\n" + context.getRawContent();
+            String qaHistory = objectMapper.writeValueAsString(answers);
+
+            Map<String, Object> agentResult = testCaseAgent.run(userInput, qaHistory);
+
+            if ("cases".equals(agentResult.get("type"))) {
+                sessionManager.remove(sessionId);
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                result.put("cases", agentResult.get("cases"));
+                result.put("canGenerate", true);
+                return Result.<Map<String, Object>>success(result);
+            } else if ("questions".equals(agentResult.get("type"))) {
+                context.setQaHistory(context.getQaHistory());
+                for (Map<String, String> answer : answers) {
+                    context.addQA(answer.get("question"), answer.get("answer"));
+                }
+                sessionManager.update(sessionId, context);
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                result.put("questions", agentResult.get("questions"));
+                result.put("canGenerate", false);
+                return Result.<Map<String, Object>>success(result);
+            } else {
+                return Result.<Map<String, Object>>error("Agent 执行失败: " + agentResult.get("message"));
+            }
+        } catch (Exception e) {
+            log.error("Agent 生成失败", e);
+            return Result.<Map<String, Object>>error("Agent 生成失败: " + e.getMessage());
         }
     }
 }

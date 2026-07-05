@@ -2,7 +2,7 @@
 
 ## Project Information
 
-- **Project Name**: 自动化测试平台 (Automated Testing Platform)
+- **Project Name**: AutoTestPlatform / 自动化测试平台
 - **Started**: 2026-05-25T21:13:00+08:00
 
 ---
@@ -20,20 +20,20 @@
 ### Reverse Engineering - Start
 **Timestamp**: 2026-05-25T21:14:00+08:00
 **Context**: Starting comprehensive codebase analysis
-**Details**: Read all backend controllers, services, entities, mappers, configs, AOP, POM, frontend components, SQL schemas
+**Details**: Read all backend controllers, services, entities, mappers, configs, AOP, POM, POM file, frontend components, SQL schemas
 
 ---
 
 ### Reverse Engineering - Complete
 **Timestamp**: 2026-05-25T21:20:00+08:00
-**Context**: Generated 6 reverse engineering artifacts
+**Context**: Generated reverse engineering artifacts
 **Artifacts**:
-- architecture.md - High-level architecture with ASCII diagram
-- component-inventory.md - 30+ components identified with responsibilities
-- code-structure.md - Full directory structure and package organization
-- api-documentation.md - 20+ API endpoints documented
-- technology-stack.md - Full tech stack (15+ technologies)
-- dependencies.md - Internal/external dependency chains
+- architecture.md
+- component-inventory.md
+- code-structure.md
+- api-documentation.md
+- technology-stack.md
+- dependencies.md
 
 ---
 
@@ -41,10 +41,9 @@
 **Timestamp**: 2026-05-25T21:25:00+08:00
 **User Input**: "把幂等性实现成声明式注入即可，我会自己把它添加到想要幂等的接口"
 **Completed**:
-- Created @Idempotent annotation (Aop/anno/Idempotent.java)
-- Created IdempotentAspect (Redis SETNX based)
-- Created IdempotentController (GET /api/idempotent/token)
-- Fixed javax.servlet import for Spring Boot 2.6.13
+- Created `@Idempotent` annotation
+- Created Redis-based `IdempotentAspect`
+- Integrated idempotency on batch execution endpoints
 
 ---
 
@@ -52,12 +51,11 @@
 **Timestamp**: 2026-05-25T21:50:00+08:00
 **User Input**: "skill我是打算直接用市面上有的skill" / "使用类似于skill.sh网站上的skill"
 **Completed**:
-- Created skills/ directory with 6 SKILL.md files
-- Created register.json as skill registry
-- Doc parser skills for markdown, pdf, word
-- API test case generator skill (core, enforces use_case schema)
-- UI test case generator (placeholder, disabled)
-- Result analyzer (placeholder, disabled)
+- Created project `skills/` directory
+- Added doc parser skills for markdown, PDF, and Word
+- Added API test case generator skill
+- Added UI test case generator skill as extension point
+- Added test result analyzer skill
 
 ---
 
@@ -65,64 +63,97 @@
 **Timestamp**: 2026-05-25T22:05:00+08:00
 **User Input**: "agent你调用大模型，现在你可以先用火山方舟的coding-plan"
 **Completed**:
-- Created AIClient.java (Volcano Engine ARK API)
-- Created AIModelConfig with 5 model assignments
-- Created PipelineOrchestrator (full pipeline flow)
-- Created RequirementAnalyzer, QuestionGenerator, ResultAnalyzer agents
-- Created ApiTestCaseGenerator, UiTestCaseGenerator (strategy pattern)
-- Created AIController with 4 endpoints
-- Created SessionManager (Redis-based, 30min TTL)
-- Created SkillLoader (auto path resolution)
-
-**Issues Fixed**:
-- BOM character in AIController.java (UTF-8 BOM removed)
-- Java generic type inference (explicit type witnesses added)
-- Result.java msg type changed from T to String
+- Created AI model configuration and client
+- Created pipeline orchestrator
+- Created requirement/question/result analyzer agents
+- Created API/UI generator strategy structure
+- Created AIController and SessionManager
+- Created SkillLoader
 
 ---
 
 ### Frontend Development
 **Timestamp**: 2026-05-25T22:30:00+08:00
 **Completed**:
-- Created AiRequirement.vue (3-step AI page: upload → Q&A → generate)
-- Added /ai-requirement route to router
-- Added "AI 智能" sidebar menu to App.vue
-- Added idempotent token flow to BatchExecute.vue
-- Added AI analyze button + structured result dialog to BatchExecute.vue
-- Added idempotent token to UiBatchExecute.vue
-
-**Issues Fixed**:
-- computed import missing (caused white screen)
-- vite.config.js removed invalid historyApiFallback
-- File upload switched from el-upload to native input
-- $refs usage fixed for Vue 3 Composition API
-- Multipart upload changed to JSON body (Vite proxy multipart issue)
+- Created AI requirement page
+- Added `/ai-requirement` route and sidebar menu
+- Added batch execution result analysis UI
+- Updated batch execution and UI batch execution flows
 
 ---
 
 ### Phase 5: AI Result Analysis
 **Timestamp**: 2026-05-25T23:00:00+08:00
 **Completed**:
-- ResultAnalyzer now reads test_case_report from DB
-- Passes real request/response/assert data to AI
-- Frontend displays structured analysis cards with verdict, root cause, suggestion
+- ResultAnalyzer reads persisted `test_case_report` data
+- AI receives request, response, assertion, and report status context
+- Frontend displays AI analysis details
 
 ---
 
 ### Phase 6: UI Test Case Extension Point
 **Timestamp**: 2026-05-25T23:05:00+08:00
 **Completed**:
-- UiTestCaseGenerator placeholder (throws UnsupportedOperationException)
-- test-case-generator-ui SKILL.md (disabled in register.json)
+- Added UI test case generator extension point
+- Added UI test case generation skill skeleton
 
 ---
 
 ### Sample Requirement Document
 **Timestamp**: 2026-05-25T23:10:00+08:00
-**Details**: Created sample-requirement.md for testing, with intentional info gaps (missing URLs, methods, assertions) to trigger AI questioning.
+**Details**: Created `sample-requirement.md` for AI requirement analysis testing.
 
 ---
 
 ### State Documentation Updated
 **Timestamp**: 2026-05-25T23:20:00+08:00
-**Details**: Updated aidlc-state.md with complete architecture summary, unit list, and next steps for new session continuation.
+**Details**: Updated `aidlc-state.md` with then-current architecture summary, unit list, and next steps.
+
+---
+
+### AI-DLC Documentation Refresh Requested
+**Timestamp**: 2026-06-29T09:10:10+08:00
+**User Input**: "当前项目在之前发生过更改，但是aidlc文件夹未更新过了，所以新的窗口了解这个项目时会有差错，你更新一下aidlc文件吧，方便快速了解项目"
+**Context**: User requested refreshing `aidlc-docs` to reflect current project state so new sessions can understand the project accurately.
+
+---
+
+### Reverse Engineering Refresh - Complete
+**Timestamp**: 2026-06-29T09:10:10+08:00
+**Context**: Refreshed AI-DLC project knowledge from current codebase without modifying business code.
+**Files Reviewed**:
+- `aidlc-docs/aidlc-state.md`
+- `aidlc-docs/inception/reverse-engineering/*.md`
+- `README.md`
+- `AutoTest_fronted/package.json`
+- `AutoTest_fronted/src/App.vue`
+- `AutoTest_fronted/src/router/index.js`
+- `AutoTest_fronted/src/main.js`
+- `AutoTest_fronted/src/views/AiRequirement.vue`
+- `AutoTest_fronted/vite.config.js`
+- `backed/AI_Study_Notes/pom.xml`
+- `backed/AI_Study_Notes/src/main/resources/application*.yml`
+- `backed/init.sql`
+- Backend controller/service/AI package structure under `backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes`
+- `skills/*/SKILL.md`
+- `scripts/README.md`
+
+**Artifacts Updated**:
+- `aidlc-docs/aidlc-state.md`
+- `aidlc-docs/inception/reverse-engineering/architecture.md`
+- `aidlc-docs/inception/reverse-engineering/component-inventory.md`
+- `aidlc-docs/inception/reverse-engineering/code-structure.md`
+- `aidlc-docs/inception/reverse-engineering/api-documentation.md`
+- `aidlc-docs/inception/reverse-engineering/technology-stack.md`
+- `aidlc-docs/inception/reverse-engineering/dependencies.md`
+- `aidlc-docs/audit.md`
+
+**Key Current Findings**:
+- Current workspace root is `D:/桌面/AutoTestPlatform`.
+- Backend is Spring Boot 3.2.5 / Java 17, not Spring Boot 2.6.13.
+- AI client uses LangChain4j OpenAI-compatible chat and streaming models.
+- AI requirement page supports pipeline streaming mode and ReAct Agent mode.
+- New AI endpoints include streaming and agent endpoints.
+- `skills/register.json` is absent; `SkillLoader` reads `skills/*/SKILL.md` frontmatter directly.
+- Idempotency is request hash based and has no token endpoint.
+- Secret management scripts exist; AI-DLC docs intentionally avoid recording raw secrets.

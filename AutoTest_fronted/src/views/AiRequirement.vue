@@ -21,6 +21,12 @@
       <div v-if="step === 1" class="step-section">
         <div class="section-title">第一步：上传需求文档</div>
         <el-form label-width="100px">
+          <el-form-item label="分析模式">
+            <el-radio-group v-model="agentMode">
+              <el-radio :value="false">管道模式（流式）</el-radio>
+              <el-radio :value="true">Agent 模式（自主决策）</el-radio>
+            </el-radio-group>
+          </el-form-item>
           <el-form-item label="选择项目">
             <el-select v-model="projectId" placeholder="请选择目标项目" style="width: 300px;">
               <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
@@ -166,6 +172,7 @@ export default {
     const canGenerate = ref(false)
     const generatedCases = ref([])
     const caseCount = ref(0)
+    const agentMode = ref(false)
 
     const progressStep = ref(0)
     const progressDesc = ref({ parsing: '', analyzing: '', generating_questions: '' })
@@ -208,46 +215,70 @@ export default {
         return
       }
       analyzing.value = true
-      progressStep.value = 0
-      streamContent.value = ''
-      progressDesc.value = { parsing: '', analyzing: '', generating_questions: '' }
 
       try {
         const text = await uploadFile.value.text()
-        const response = await fetch('/api/ai/analyze-requirement-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+
+        if (agentMode.value) {
+          const res = await axios.post('/ai/agent-analyze', {
             fileName: uploadFile.value.name,
             content: text,
             projectId: projectId.value
           })
-        })
+          const data = res.data.data
+          sessionId.value = data.sessionId || ''
+          questions.value = data.questions || []
+          canGenerate.value = data.canGenerate || false
+          qaAnswers.value = []
+          qaInputs.value = []
 
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
+          if (data.cases) {
+            generatedCases.value = data.cases
+            caseCount.value = generatedCases.value.length
+            step.value = 3
+          } else {
+            step.value = 2
+          }
+        } else {
+          progressStep.value = 0
+          streamContent.value = ''
+          progressDesc.value = { parsing: '', analyzing: '', generating_questions: '' }
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+          const response = await fetch('/api/ai/analyze-requirement-stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: uploadFile.value.name,
+              content: text,
+              projectId: projectId.value
+            })
+          })
 
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
 
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              const data = line.substring(5).trim()
-              try {
-                const event = JSON.parse(data)
-                handleStreamEvent(event)
-              } catch (_) {}
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                const data = line.substring(5).trim()
+                try {
+                  const event = JSON.parse(data)
+                  handleStreamEvent(event)
+                } catch (_) {}
+              }
             }
           }
         }
       } catch (e) {
-        ElMessage.error('分析失败: ' + e.message)
+        ElMessage.error('分析失败: ' + (e.response?.data?.msg || e.message))
       } finally {
         analyzing.value = false
       }
@@ -312,14 +343,29 @@ export default {
       }
       submitting.value = true
       try {
-        const res = await axios.post('/ai/submit-answers?sessionId=' + sessionId.value, answers)
-        const data = res.data.data
-        questions.value = data.questions || []
-        canGenerate.value = data.canGenerate || false
-        qaAnswers.value = []
-        qaInputs.value = []
-        if (canGenerate.value && (!questions.value || questions.value.length === 0)) {
-          ElMessage.success('所有信息已完善，可以生成用例了')
+        if (agentMode.value) {
+          const res = await axios.post('/ai/agent-generate?sessionId=' + sessionId.value, answers)
+          const data = res.data.data
+          if (data.cases) {
+            generatedCases.value = data.cases
+            caseCount.value = generatedCases.value.length
+            step.value = 3
+          } else {
+            questions.value = data.questions || []
+            canGenerate.value = data.canGenerate || false
+            qaAnswers.value = []
+            qaInputs.value = []
+          }
+        } else {
+          const res = await axios.post('/ai/submit-answers?sessionId=' + sessionId.value, answers)
+          const data = res.data.data
+          questions.value = data.questions || []
+          canGenerate.value = data.canGenerate || false
+          qaAnswers.value = []
+          qaInputs.value = []
+          if (canGenerate.value && (!questions.value || questions.value.length === 0)) {
+            ElMessage.success('所有信息已完善，可以生成用例了')
+          }
         }
       } catch (e) {
         ElMessage.error('提交失败: ' + (e.response?.data?.msg || e.message))
@@ -378,7 +424,7 @@ export default {
 
     return {
       step, projects, projectId, uploadFile, uploadFileName, fileInputRef, analyzing, submitting, generating, saving,
-      sessionId, questions, qaAnswers, qaInputs, canGenerate, generatedCases, caseCount,
+      sessionId, questions, qaAnswers, qaInputs, canGenerate, generatedCases, caseCount, agentMode,
       progressStep, progressDesc, streamContent, streamStageLabel,
       handleFileChange, startAnalysis, submitAnswers, generateCases, saveCases, reset, methodTag, selectFile
     }

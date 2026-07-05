@@ -121,7 +121,7 @@ public class AIClient {
                 .modelName(m)
                 .maxTokens(4096)
                 .temperature(0.3)
-                .timeout(Duration.ofSeconds(120))
+                .timeout(Duration.ofSeconds(300))
                 .build());
     }
 
