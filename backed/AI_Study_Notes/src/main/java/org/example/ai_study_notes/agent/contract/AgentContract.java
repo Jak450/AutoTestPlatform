@@ -24,7 +24,8 @@ public final class AgentContract {
             "stop", "length", "toolUse", "error", "aborted",
             "token_capped", "loop_capped", "turn_capped", "awaiting_confirmation");
 
-    public static final List<String> PERMISSIONS = List.of("read", "confirm_write", "confirm_execute", "deny");
+    public static final List<String> PERMISSIONS = List.of(
+            "read", "auto_write", "confirm_write", "confirm_execute", "deny");
 
     public static final List<String> ROLES = List.of("user", "admin");
 

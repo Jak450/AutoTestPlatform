@@ -24,6 +24,7 @@ public class AgentProperties {
         private String model = "deepseek-v4-flash";
         private double temperature = 0.3;
         private int maxTokens = 4096;
+        private int generationMaxTokens = 8192;
         private int timeoutSeconds = 300;
     }
 

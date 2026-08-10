@@ -216,3 +216,111 @@ node agent-eval/run-eval.mjs --rounds 2
 ```
 
 运行前提：MySQL（导入 `backed/init.sql`）、Redis、`DEEPSEEK_API_KEY` 环境变量；测试默认账号 admin/12345678。
+
+## 14. 私有测试知识库（MD 文件存储，2026-08-10 新增）
+
+> 定位：把会话中沉淀的测试经验/知识结论提炼为"私有测试知识"，按用户隔离，以 MD 文件存储，
+> 提问测试知识时自动检索注入。存储与维护对人友好（可直接编辑、git 管理），不依赖数据库。
+
+### 目录结构
+
+```text
+{data-dir}/knowledge/{userId}/
+├── _candidates/                # 自动提炼、待用户确认（confirmed: false）
+└── {category}/{slug}.md        # 已确认知识（confirmed: true）
+```
+
+每个 MD 文件带 YAML frontmatter（与 SKILL.md 同风格）：
+
+```markdown
+---
+title: 登录接口超时经验
+category: 经验教训
+tags: [登录, 超时, 重试]
+confirmed: true
+updated: 2026-08-10T21:30:08
+---
+
+正文（Markdown）…
+```
+
+### 工具（4 个，已注册进 Agent）
+
+| 工具 | 权限 | 说明 |
+|---|---|---|
+| `save_knowledge` | 需确认 | 按标题/分类保存或覆盖知识文档（覆盖需 overwrite=true） |
+| `search_knowledge` | 自动放行 | 按关键词检索标题/标签/内容，返回 Top-N 片段 |
+| `list_knowledge` | 自动放行 | 列出全部或指定分类的知识文档 |
+| `delete_knowledge` | 需确认 | 删除知识文档 |
+
+### 检索注入
+
+每个 turn 用最近用户消息做关键词检索（复用记忆的词频打分思路），取 Top-5、总预算 2KB，
+以"私有测试知识（已确认）"小节注入系统提示词；系统规则第 9 条要求回答知识/经验问题时优先引用。
+
+### 自动提炼与入库
+
+- `MemoryExtractor` 扩展为两类提炼：`preference`（偏好，仍走 `agent_memory` 候选确认）与
+  `knowledge`（知识，**自动直接入库**：写入正式分类目录、`confirmed: true`，无需用户逐条确认）
+- 自动入库有质量门控与**去重/合并决策**：提炼提示词只允许"用户明确陈述、具体可复用、不臆造"的经验，
+  宁可少提炼不要错提炼；提炼时把已有知识库（标题+摘要，最多 10 条）一并给模型，
+  由模型对每条新知识输出 `action`：
+  - `create`：新主题 → 新建文档；
+  - `append`：与已有文档同主题 → 追加为新小节（`targetTitle` 指定目标），避免知识越堆越多；
+  - `skip`：与已有内容重复 → 不入库。
+  词法相似度（字符二元组）作为兜底：≥0.65 视为重复跳过；`findByTitle` 用于定位 append 目标。
+- `save_knowledge` 工具权限改为 `auto_write`（**自动执行、不再弹确认卡**），
+  `delete_knowledge` 仍为需确认；系统规则第 10 条要求 Agent 日常交流不主动调用 save_knowledge
+- 前端资源面板"知识"分组**按分类分组展示**（含每类计数），支持查看全文；
+  `_candidates` 候选机制保留用于兼容/手动场景（`POST /api/agent/knowledge/{slug}/confirm` 仍可用）
+- 管理 API：`GET /api/agent/knowledge`（列表/候选/详情）、`DELETE /api/agent/knowledge`（删除）
+
+### 已知修复
+
+- `agent_memory.tags` 列是 JSON 类型，代码原先写入普通字符串（如 `auto`）导致提炼入库报错；
+  已改为写入合法 JSON 数组（`["auto"]`），并让提炼循环单条失败不中断其余条目
+
+## 15. 工具调用幂等与重传（2026-08-10 新增）
+
+> 背景：LLM 调用断连/前端重传时，写类工具可能被重复执行（如重复建项目、重复保存）。
+> 通过 `agent_tool_execution` 表按 (conversation_id, tool_name, payload_hash) 唯一记录，保证同参数写操作只执行一次。
+
+### 表结构（`backed/init.sql` + 线上库已建）
+
+```text
+agent_tool_execution(
+  id, conversation_id, tool_call_id, tool_name, payload_hash,
+  status(running/success/failed), result(JSON), created_at, updated_at)
+UNIQUE KEY (conversation_id, tool_name, payload_hash)
+```
+
+### 幂等语义（ToolExecutionService）
+
+- 只对**写类工具**（`CONFIRM_WRITE` / `AUTO_WRITE`）生效；查询、执行测试类工具不参与（有意重跑不受影响）
+- 首次执行：插入 `running` 记录 → 执行 → 更新 `success/failed` + 结果 JSON
+- 重传同参数：唯一键冲突 → 读已有记录：
+  - `success` 且 10 分钟内 → **重放上次结果**（不重复执行，消息标注"幂等重放"）
+  - `running` → 返回"正在执行中"，阻止并发重复
+  - `failed` / 过期成功 → 重置 `running` 允许重试
+- `save_cases` 批量入库加 `@Transactional(rollbackFor=Exception.class)`，单批原子
+
+### 过度调用修复（系统提示词规则 8）
+
+- 用户只要求"分析/解读/总结"文档 → 仅 `list_files + parse_document`，**不生成用例**
+- 用户明确要求生成用例 → 才走 generate_cases →（要求试跑时）trial_run_cases → save_cases
+- 未明确要求生成时绝不主动调用 generate_cases / trial_run_cases / save_cases
+
+### 测试
+
+`ToolExecutionIdempotencyTest`：同参数只执行一次并重放、失败可重试、执行中拦截、读工具不记录。
+
+### 迁移
+
+`KnowledgeMigration`（启动时执行一次，按用户以标记文件防重跑）会把已确认的 DB 记忆
+（`agent_memory`，confirmed=1）导出为 MD 知识文档，分类 `记忆迁移`。
+
+### 注意点
+
+- 写入用"临时文件 + 原子 move"，避免写到一半损坏
+- 目录/文件名分段做消毒（禁止 `..`、`/`、`\` 等），防止目录穿越
+- `ReadBeforeWriteMiddleware` 对 `save/delete_knowledge` 豁免（知识内容自包含，无需先查平台数据）

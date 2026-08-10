@@ -58,6 +58,21 @@ public final class Args {
         throw new IllegalArgumentException("参数 " + key + " 必须是整数数组");
     }
 
+    public static List<String> strList(Map<String, Object> args, String key) {
+        Object value = args.get(key);
+        if (value == null) {
+            return new ArrayList<>();
+        }
+        if (value instanceof List<?> list) {
+            List<String> result = new ArrayList<>();
+            for (Object item : list) {
+                result.add(String.valueOf(item));
+            }
+            return result;
+        }
+        throw new IllegalArgumentException("参数 " + key + " 必须是字符串数组");
+    }
+
     @SuppressWarnings("unchecked")
     public static List<Map<String, Object>> listOfMaps(Map<String, Object> args, String key) {
         Object value = args.get(key);

@@ -23,6 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ReadBeforeWriteMiddleware implements Middleware {
 
     private static final int RECENT_READ_WINDOW = 10;
+    /**
+     * 用户内容类写入无需"先查询平台数据"：知识文档是自包含内容，不涉及平台实体。
+     */
+    private static final Set<String> NO_READ_REQUIRED = Set.of(
+            "save_knowledge", "delete_knowledge");
 
     @Override
     public int order() {
@@ -40,6 +45,9 @@ public class ReadBeforeWriteMiddleware implements Middleware {
     public Optional<ToolResult> before(String toolName, Map<String, Object> args, ToolContext context) {
         ToolDefinition definition = toolRegistry.get(toolName);
         if (definition == null || definition.getPermission() != ToolPermission.CONFIRM_WRITE) {
+            return Optional.empty();
+        }
+        if (NO_READ_REQUIRED.contains(toolName)) {
             return Optional.empty();
         }
         Set<String> reads = recentReads.computeIfAbsent(context.getConversationId(), k -> new HashSet<>());

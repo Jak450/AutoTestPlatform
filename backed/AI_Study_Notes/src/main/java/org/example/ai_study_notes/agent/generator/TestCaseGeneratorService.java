@@ -14,6 +14,7 @@ import org.example.ai_study_notes.agent.template.CaseTemplate;
 import org.example.ai_study_notes.agent.template.CaseTemplateService;
 import org.example.ai_study_notes.service.UseCaseService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -88,10 +89,22 @@ public class TestCaseGeneratorService {
         if (projectId != null) {
             user.append("\n\n目标项目ID: ").append(projectId);
         }
-        String raw = aiClient.chat(system.toString(), user.toString());
-        List<Map<String, Object>> cases = parseJsonArray(raw);
-        appendCasePreview(conversationId, cases, template == null ? null : template.getId(), projectId);
-        return cases;
+        // 模型偶发输出被截断/非法 JSON，做有限重试；生成预算已单独放大（generation-max-tokens）
+        for (int attempt = 1; ; attempt++) {
+            String raw = aiClient.chat(system.toString(), user.toString());
+            try {
+                List<Map<String, Object>> cases = parseJsonArray(raw);
+                appendCasePreview(conversationId, cases, template == null ? null : template.getId(), projectId);
+                return cases;
+            } catch (Exception e) {
+                if (attempt >= 3) {
+                    throw new IllegalStateException("模型多次返回不合法用例 JSON: " + e.getMessage(), e);
+                }
+                log.warn("generate_cases 第 {} 次输出解析失败，重试: {}", attempt, e.getMessage());
+                user.append("\n\n【重要】上一次输出不是完整合法的 JSON 数组。请重新输出：只输出 JSON 数组本身，"
+                        + "不要任何解释或 markdown 代码块标记，所有字符串必须完整闭合，不要省略字段。");
+            }
+        }
     }
 
     public List<String> validateCases(List<Map<String, Object>> cases) {
@@ -122,6 +135,7 @@ public class TestCaseGeneratorService {
         return errors;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public int saveCases(List<Map<String, Object>> cases, Integer projectId) {
         List<String> errors = validateCases(cases);
         if (!errors.isEmpty()) {
@@ -176,6 +190,9 @@ public class TestCaseGeneratorService {
     }
 
     private List<Map<String, Object>> parseJsonArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalStateException("模型未返回文本内容（输出为空）");
+        }
         String cleaned = raw.trim();
         if (cleaned.startsWith("```")) {
             int first = cleaned.indexOf('\n');

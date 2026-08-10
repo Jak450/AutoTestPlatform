@@ -223,3 +223,17 @@ CREATE TABLE IF NOT EXISTS `agent_audit_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 默认管理员账号: admin / 密码由应用启动时初始化（BCrypt），勿在此写入明文
+
+CREATE TABLE IF NOT EXISTS `agent_tool_execution` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `conversation_id` BIGINT UNSIGNED NOT NULL,
+  `tool_call_id` VARCHAR(128) NULL,
+  `tool_name` VARCHAR(64) NOT NULL,
+  `payload_hash` CHAR(64) NOT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'running',
+  `result` TEXT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_agent_tool_exec_conv_tool_hash` (`conversation_id`, `tool_name`, `payload_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

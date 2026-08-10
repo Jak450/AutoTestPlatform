@@ -12,4 +12,5 @@ public class ToolContext {
 
     private Long userId;
     private Long conversationId;
+    private String toolCallId;
 }

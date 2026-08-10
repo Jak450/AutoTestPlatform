@@ -100,7 +100,8 @@ public class ConfirmationController {
                 return Result.error("确认已过期或已处理，请重新发起操作");
             }
             ToolResult result = toolExecutionService.execute(pending.getToolName(), pending.getArgs(),
-                    ToolContext.builder().userId(userId).conversationId(conversationId).build(), true);
+                    ToolContext.builder().userId(userId).conversationId(conversationId)
+                            .toolCallId(pending.getToolCallId()).build(), true);
             auditService.log(userId, conversationId, null, "confirmation_approved",
                     Map.of("confirmationId", confirmationId, "toolName", pending.getToolName(),
                             "status", result.getStatus().value()));

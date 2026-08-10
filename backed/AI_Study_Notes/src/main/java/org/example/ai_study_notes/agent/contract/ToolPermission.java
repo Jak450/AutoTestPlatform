@@ -5,6 +5,7 @@ package org.example.ai_study_notes.agent.contract;
  */
 public enum ToolPermission {
     READ("read"),
+    AUTO_WRITE("auto_write"),
     CONFIRM_WRITE("confirm_write"),
     CONFIRM_EXECUTE("confirm_execute"),
     DENY("deny");

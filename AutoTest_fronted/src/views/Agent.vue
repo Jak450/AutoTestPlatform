@@ -44,7 +44,8 @@
       </div>
     </div>
 
-    <ResourcePanel :files="files" :templates="templates" :memories="memories" @confirm-memory="confirmMemory" />
+    <ResourcePanel :files="files" :templates="templates" :memories="memories" :knowledge-docs="knowledgeDocs"
+                   @confirm-memory="confirmMemory" @confirm-knowledge="confirmKnowledge" />
   </div>
 </template>
 
@@ -67,6 +68,7 @@ export default {
     const files = ref([])
     const templates = ref([])
     const memories = ref([])
+    const knowledgeDocs = ref([])
     let eventSource = null
     let lastEventId = 0
     const messageList = ref(null)
@@ -92,14 +94,16 @@ export default {
         return
       }
       try {
-        const [fr, tr, mr] = await Promise.all([
+        const [fr, tr, mr, kr] = await Promise.all([
           axios.get(`/agent/conversations/${currentId.value}/files`),
           axios.get('/agent/templates'),
-          axios.get('/agent/memory')
+          axios.get('/agent/memory'),
+          axios.get('/agent/knowledge', { params: { includeCandidates: true } })
         ])
         files.value = (fr.data && fr.data.data) || []
         templates.value = (tr.data && tr.data.data) || []
         memories.value = (mr.data && mr.data.data) || []
+        knowledgeDocs.value = (kr.data && kr.data.data) || []
       } catch (e) {
         // 资源加载失败不阻塞主流程
       }
@@ -515,6 +519,15 @@ export default {
       }
     }
 
+    const confirmKnowledge = async (knowledge) => {
+      try {
+        await axios.post(`/agent/knowledge/${knowledge.slug}/confirm`)
+        loadResources()
+      } catch (e) {
+        pushSystemMessage((e.response && e.response.data && e.response.data.msg) || '确认知识失败')
+      }
+    }
+
     const cancelRun = async () => {
       try {
         await axios.post(`/agent/conversations/${currentId.value}/cancel`)
@@ -554,6 +567,7 @@ export default {
       files,
       templates,
       memories,
+      knowledgeDocs,
       messageList,
       fileInput,
       uploadFile,
@@ -563,7 +577,8 @@ export default {
       sendMessage,
       cancelRun,
       respondConfirmation,
-      confirmMemory
+      confirmMemory,
+      confirmKnowledge
     }
   }
 }

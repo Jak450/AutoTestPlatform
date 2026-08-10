@@ -12,6 +12,7 @@ import org.example.ai_study_notes.agent.context.ContextAssembler;
 import org.example.ai_study_notes.agent.context.ContextCompactor;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
+import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
 import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.example.ai_study_notes.agent.memory.MemoryExtractor;
 import org.example.ai_study_notes.agent.session.AgentMessage;
@@ -55,6 +56,7 @@ public class AgentLoop {
     private final SkillService skillService;
     private final AuditService auditService;
     private final RunRegistry runRegistry;
+    private final KnowledgeService knowledgeService;
     private final ObjectMapper objectMapper;
     private final AgentProperties properties;
 
@@ -73,6 +75,7 @@ public class AgentLoop {
                      SkillService skillService,
                      AuditService auditService,
                      RunRegistry runRegistry,
+                     KnowledgeService knowledgeService,
                      ObjectMapper objectMapper,
                      AgentProperties properties) {
         this.llmClient = llmClient;
@@ -90,6 +93,7 @@ public class AgentLoop {
         this.skillService = skillService;
         this.auditService = auditService;
         this.runRegistry = runRegistry;
+        this.knowledgeService = knowledgeService;
         this.objectMapper = objectMapper;
         this.properties = properties;
     }
@@ -143,11 +147,13 @@ public class AgentLoop {
         List<LlmMessage> messages = new ArrayList<>();
         List<String> memories = userId == null ? java.util.List.of()
                 : memoryService.injectable(userId, memoryQuery(conversationId));
+        List<String> knowledge = userId == null ? java.util.List.of()
+                : knowledgeService.injectable(userId, memoryQuery(conversationId), 2048);
         List<String> skillBodies = skillService.activeSkills(conversationId).stream()
                 .map(AgentSkill::getBody).toList();
         messages.add(LlmMessage.builder()
                 .role("system")
-                .content(systemPromptBuilder.build(memories, skillBodies))
+                .content(systemPromptBuilder.build(memories, skillBodies, knowledge))
                 .build());
         messages.addAll(contextAssembler.toLlmMessages(conversationId));
 
@@ -229,7 +235,8 @@ public class AgentLoop {
                             "toolCallId", call.getId(), "toolName", call.getName(), "status", "running"));
 
                     ToolResult result = toolExecutionService.execute(call.getName(), args,
-                            ToolContext.builder().userId(userId).conversationId(conversationId).build(), false);
+                            ToolContext.builder().userId(userId).conversationId(conversationId)
+                                    .toolCallId(call.getId()).build(), false);
 
                     if (result.isRequiresConfirmation()) {
                         AgentConfirmation confirmation = confirmationService.create(

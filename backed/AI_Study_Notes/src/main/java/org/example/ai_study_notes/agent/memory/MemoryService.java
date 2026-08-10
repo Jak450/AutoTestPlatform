@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 长期记忆服务：按用户隔离，同 key 覆盖升级版本。
@@ -52,7 +53,7 @@ public class MemoryService {
                 throw new IllegalArgumentException("记忆已存在，覆盖需要用户确认（overwrite=true）");
             }
             existing.setContentMd(content);
-            existing.setTags(tags == null ? null : String.join(",", tags));
+            existing.setTags(toJsonTags(tags));
             existing.setVersion((existing.getVersion() == null ? 1 : existing.getVersion()) + 1);
             existing.setConfirmed(1);
             existing.setSourceSessionId(sourceSessionId);
@@ -65,7 +66,7 @@ public class MemoryService {
                 .namespace("preference")
                 .memKey(key)
                 .contentMd(content)
-                .tags(tags == null ? null : String.join(",", tags))
+                .tags(toJsonTags(tags))
                 .confidence("medium")
                 .confirmed(1)
                 .sourceSessionId(sourceSessionId)
@@ -96,7 +97,7 @@ public class MemoryService {
                 .namespace("candidate")
                 .memKey(key)
                 .contentMd(content)
-                .tags("auto")
+                .tags(toJsonTags(List.of("auto")))
                 .confidence("medium")
                 .confirmed(0)
                 .version(1)
@@ -177,5 +178,17 @@ public class MemoryService {
             }
         }
         return terms;
+    }
+
+    /**
+     * tags 列是 JSON 类型，必须以合法 JSON 数组字符串写入（如 ["auto"] / ["a","b"]）。
+     */
+    private String toJsonTags(List<String> tags) {
+        if (tags == null) {
+            return "[]";
+        }
+        return tags.stream()
+                .map(t -> "\"" + t.replace("\"", "\\\"") + "\"")
+                .collect(Collectors.joining(",", "[", "]"));
     }
 }

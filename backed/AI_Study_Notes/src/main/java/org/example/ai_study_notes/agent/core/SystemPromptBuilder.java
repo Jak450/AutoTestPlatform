@@ -9,6 +9,11 @@ import org.springframework.stereotype.Component;
 public class SystemPromptBuilder {
 
     public String build(java.util.List<String> memories, java.util.List<String> skillBodies) {
+        return build(memories, skillBodies, java.util.List.of());
+    }
+
+    public String build(java.util.List<String> memories, java.util.List<String> skillBodies,
+                        java.util.List<String> knowledge) {
         StringBuilder prompt = new StringBuilder("""
                 你是 AutoTestPlatform 的测试助手。
 
@@ -28,12 +33,20 @@ public class SystemPromptBuilder {
                 5. 涉及执行测试时说明影响范围（用例数、执行次数、并发数）。
                 6. 所有 JSON 参数必须严格符合工具输入 Schema。
                 7. 回答使用中文，简洁、结构化。
-                8. 当用户要求"根据需求文档生成测试用例"时，流程为：
-                   a. 用 list_files 找到文档，用 parse_document 或 read_file_content 读取内容；
-                   b. 调用 generate_cases 生成用例草稿（直接传 fileId=文档ID 即可，不要手动拼接长文本；可先 load_template 指定模板）；
-                   c. 生成后用 trial_run_cases 试跑草稿（试跑需要用户确认），把可用性报告展示给用户；
-                   d. 用户确认后再调用 save_cases 保存到用例库（保存也需要用户确认）。
-                   解析完成后必须立即调用 generate_cases 生成草稿并展示，不要只做文档摘要而不生成。
+                8. 文档处理严格按用户意图执行，绝不越权多做事：
+                   - 用户只要求"分析/解读/总结/看看"文档 → 用 list_files 找到文档、parse_document 解析，
+                     给出分析结论、接口清单与信息缺口即可，不要生成用例、不要试跑、不要保存；
+                   - 用户明确要求"生成/设计测试用例" → 才走完整流程：
+                     a. list_files 找到文档，parse_document 读取；
+                     b. generate_cases 生成草稿（可先 load_template 指定模板）；
+                     c. 用户要求试跑时再 trial_run_cases；
+                     d. 用户确认后再 save_cases。
+                   - 用户没有明确要求生成用例时，绝不主动调用 generate_cases / trial_run_cases / save_cases。
+                9. 回答测试知识、测试经验、项目规范类问题时，优先引用"私有测试知识"中的内容；
+                   知识库没有覆盖时，再结合通用测试方法论回答，并说明哪些是私有知识、哪些是通用结论。
+                10. 系统会在对话结束后自动提炼对话中的测试经验/知识结论并入库（无需用户确认）。
+                    用户提到经验、踩坑、约定时，正常交流回答即可，不要主动调用 save_knowledge；
+                    仅当用户明确说"保存/记录到知识库"时才调用 save_knowledge。
                 """);
         if (memories != null && !memories.isEmpty()) {
             prompt.append("\n\n相关记忆（用户确认过的偏好与约定，供参考）:\n");
@@ -45,6 +58,12 @@ public class SystemPromptBuilder {
             prompt.append("\n\n已加载技能正文（作为执行规范）:\n");
             for (String body : skillBodies) {
                 prompt.append(body).append("\n---\n");
+            }
+        }
+        if (knowledge != null && !knowledge.isEmpty()) {
+            prompt.append("\n\n私有测试知识（按当前问题检索到的已确认知识，回答知识/经验问题时优先引用）:\n");
+            for (String item : knowledge) {
+                prompt.append("- ").append(item).append('\n');
             }
         }
         return prompt.toString();
