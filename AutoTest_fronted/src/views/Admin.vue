@@ -26,7 +26,7 @@
 
     <el-card class="admin-card">
       <template #header>
-        <div class="card-header"><span>技能</span></div>
+        <div class="card-header"><span>技能</span><el-button size="small" type="primary" plain @click="openSkillDialog">新建技能</el-button></div>
       </template>
       <el-table :data="skills" style="width: 100%">
         <el-table-column prop="name" label="技能名" width="220">
@@ -44,7 +44,7 @@
 
     <el-card class="admin-card">
       <template #header>
-        <div class="card-header"><span>模板（全量）</span></div>
+        <div class="card-header"><span>模板（全量）</span><el-button size="small" type="primary" plain @click="openTemplateDialog">新建模板</el-button></div>
       </template>
       <el-table :data="templates" style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
@@ -59,6 +59,56 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-dialog v-model="skillDialog" title="新建技能" width="640px" top="8vh">
+      <el-form :model="skillForm" label-width="90px">
+        <el-form-item label="技能名" required>
+          <el-input v-model="skillForm.name" placeholder="如 my-test-guide（字母/数字/-/_，1-64位）" />
+        </el-form-item>
+        <el-form-item label="描述" required>
+          <el-input v-model="skillForm.description" placeholder="技能用途说明（会展示在列表与对话中）" />
+        </el-form-item>
+        <el-form-item label="正文" required>
+          <el-input v-model="skillForm.content" type="textarea" :rows="10"
+                    placeholder="技能执行规范（Markdown），加载后注入系统提示词" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="skillDialog = false">取消</el-button>
+        <el-button type="primary" @click="createSkill">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="templateDialog" title="新建用例模板" width="680px" top="6vh">
+      <el-form :model="templateForm" label-width="100px">
+        <el-form-item label="名称" required>
+          <el-input v-model="templateForm.name" placeholder="模板名称，如 登录接口标准模板" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="templateForm.description" />
+        </el-form-item>
+        <el-form-item label="caseShape" required>
+          <el-input v-model="templateForm.caseShape" type="textarea" :rows="3"
+                    placeholder='用例形状 JSON，如 {"method":"POST","header":{...}}' />
+        </el-form-item>
+        <el-form-item label="覆盖规则">
+          <el-input v-model="templateForm.coverageRules" type="textarea" :rows="3"
+                    placeholder="需覆盖的场景规则" />
+        </el-form-item>
+        <el-form-item label="断言规则">
+          <el-input v-model="templateForm.assertRules" type="textarea" :rows="3"
+                    placeholder="断言要求" />
+        </el-form-item>
+        <el-form-item label="示例">
+          <el-input v-model="templateForm.examples" type="textarea" :rows="4"
+                    placeholder="示例用例（JSON 或文本）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="templateDialog = false">取消</el-button>
+        <el-button type="primary" @click="createTemplate">创建</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -75,6 +125,17 @@ export default {
     const tools = ref([])
     const skills = ref([])
     const templates = ref([])
+    const skillDialog = ref(false)
+    const skillForm = ref({ name: '', description: '', content: '' })
+    const templateDialog = ref(false)
+    const templateForm = ref({
+      name: '',
+      description: '',
+      caseShape: '{}',
+      coverageRules: '',
+      assertRules: '',
+      examples: ''
+    })
 
     const load = async () => {
       try {
@@ -124,8 +185,55 @@ export default {
       }
     }
 
+    const openSkillDialog = () => {
+      skillForm.value = { name: '', description: '', content: '' }
+      skillDialog.value = true
+    }
+
+    const createSkill = async () => {
+      if (!skillForm.value.name || !skillForm.value.content) {
+        ElMessage.warning('请填写技能名与正文')
+        return
+      }
+      try {
+        await axios.post('/agent/admin/skills', skillForm.value)
+        ElMessage.success('技能已创建')
+        skillDialog.value = false
+        load()
+      } catch (e) {
+        ElMessage.error((e.response && e.response.data && e.response.data.msg) || '创建技能失败')
+      }
+    }
+
+    const openTemplateDialog = () => {
+      templateForm.value = {
+        name: '', description: '', caseShape: '{}', coverageRules: '', assertRules: '', examples: ''
+      }
+      templateDialog.value = true
+    }
+
+    const createTemplate = async () => {
+      if (!templateForm.value.name) {
+        ElMessage.warning('请填写模板名称')
+        return
+      }
+      try {
+        await axios.post('/agent/templates', templateForm.value)
+        ElMessage.success('模板已创建')
+        templateDialog.value = false
+        load()
+      } catch (e) {
+        ElMessage.error((e.response && e.response.data && e.response.data.msg) || '创建模板失败')
+      }
+    }
+
     onMounted(load)
-    return { tools, skills, templates, toggleTool, toggleSkill, deleteTemplate }
+    return {
+      tools, skills, templates,
+      toggleTool, toggleSkill, deleteTemplate,
+      skillDialog, skillForm, openSkillDialog, createSkill,
+      templateDialog, templateForm, openTemplateDialog, createTemplate
+    }
   }
 }
 </script>
@@ -133,5 +241,10 @@ export default {
 <style scoped>
 .admin-card {
   margin-bottom: 20px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 </style>

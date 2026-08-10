@@ -161,6 +161,23 @@ export default {
         }
         return { key: `m${m.id}`, role: 'assistant', type: 'case_preview', cases }
       }
+      if (m.type === 'task_plan') {
+        let plan = {}
+        try {
+          plan = JSON.parse(m.content || '{}')
+        } catch (e) {
+          plan = {}
+        }
+        return {
+          key: `m${m.id}`,
+          role: 'assistant',
+          type: 'task_plan',
+          taskId: plan.taskId || meta.taskId,
+          title: plan.title || '',
+          status: plan.status || 'pending',
+          items: plan.items || []
+        }
+      }
       if (m.type === 'tool_call') {
         return {
           key: `m${m.id}`,
@@ -280,6 +297,8 @@ export default {
               upsertConfirmation(payload)
             } else if (payload.type === 'case_preview' || payload.cases) {
               upsertCasePreview(payload)
+            } else if (payload.type === 'task_plan') {
+              upsertTaskPlan(payload)
             } else {
               upsertStreamingText(payload)
             }
@@ -516,6 +535,25 @@ export default {
         loadResources()
       } catch (e) {
         pushSystemMessage((e.response && e.response.data && e.response.data.msg) || '确认记忆失败')
+      }
+    }
+
+    const upsertTaskPlan = (data) => {
+      const key = `p${data.messageId}`
+      const existing = messages.value.find((m) => m.key === key)
+      const card = {
+        key,
+        role: 'assistant',
+        type: 'task_plan',
+        taskId: data.taskId,
+        title: data.title || '',
+        status: data.status || 'pending',
+        items: data.items || []
+      }
+      if (existing) {
+        Object.assign(existing, card)
+      } else {
+        messages.value.push(card)
       }
     }
 

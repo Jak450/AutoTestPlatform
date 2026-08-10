@@ -260,8 +260,13 @@ updated: 2026-08-10T21:30:08
 
 ### 自动提炼与入库
 
-- `MemoryExtractor` 扩展为两类提炼：`preference`（偏好，仍走 `agent_memory` 候选确认）与
-  `knowledge`（知识，**自动直接入库**：写入正式分类目录、`confirmed: true`，无需用户逐条确认）
+- `MemoryExtractor` 两类提炼均**自动直接入库、无需用户确认**：
+  - `preference`（偏好/约定）→ `agent_memory`（`confirmed: 1`，同名跳过）
+  - `knowledge`（知识/经验）→ MD 知识库正式分类目录
+- 偏好**去重与合并**：提炼提示词会携带已有偏好清单（最多 10 条），由模型对每条偏好输出
+  `action`：`create`（新主题）/ `merge`（同主题，`targetKey` 指定合并进已有 key，内容追加 + 版本+1）/
+  `skip`（重复，不入库）——避免同主题偏好反复创建新 key 造成冗余
+- 提炼阈值：历史 ≥60 字符即触发（偏好往往一句话说清，阈值过高会漏提炼）
 - 自动入库有质量门控与**去重/合并决策**：提炼提示词只允许"用户明确陈述、具体可复用、不臆造"的经验，
   宁可少提炼不要错提炼；提炼时把已有知识库（标题+摘要，最多 10 条）一并给模型，
   由模型对每条新知识输出 `action`：
@@ -313,6 +318,54 @@ UNIQUE KEY (conversation_id, tool_name, payload_hash)
 ### 测试
 
 `ToolExecutionIdempotencyTest`：同参数只执行一次并重放、失败可重试、执行中拦截、读工具不记录。
+
+## 16. 任务计划（MD 清单，2026-08-10 新增）
+
+> 复杂/多步任务执行前先建立任务清单（MD 存储 + 状态字段），执行过程中逐步勾选，
+> 每轮注入当前清单，保证长任务不跑偏、可断点续做、对用户可见。
+
+### 存储
+
+```text
+{data-dir}/tasks/{userId}/{taskId}.md
+```
+
+frontmatter：`task_id / title / status / source_conversation / updated`，
+正文为可勾选清单（`- [ ]` / `- [x]`）。状态：`pending / in_progress / done / blocked / failed`。
+
+### 工具（4 个，Agent 工具总数 41）
+
+| 工具 | 权限 | 说明 |
+|---|---|---|
+| `create_task_plan` | 自动执行 | 建任务清单（title + items） |
+| `update_task_plan` | 自动执行 | 更新状态 + 勾选已完成步骤（doneItems 按文本匹配） |
+| `get_task_plan` | 自动放行 | 查看详情 |
+| `list_task_plans` | 自动放行 | 列表（可按会话过滤） |
+
+### 机制
+
+- 系统规则 8/11：多步任务先 `create_task_plan`，每完成一步 `update_task_plan`；单步请求不建计划
+- 每轮把当前会话活动计划（紧凑清单）注入系统提示词"当前任务计划"小节
+- `create/update_task_plan` 成功后，AgentLoop 以 `task_plan` 消息推给前端
+  （稳定 messageId=`tp-{taskId}`，同一任务原地更新，不重复堆卡）
+- 前端消息流渲染任务卡（标题 + 状态徽章 + 勾选清单），历史消息同样可渲染
+
+### 测试
+
+`TaskPlanServiceTest`：建文件/frontmatter、状态与勾选更新、活动计划注入、会话过滤、删除、路径消毒。
+
+## 17. 管理端资源创建（2026-08-11 新增）
+
+- 技能：`POST /api/agent/admin/skills`（admin）——按名称在 `skills/{name}/SKILL.md` 写入
+  frontmatter + 正文并**热重载**；管理页"新建技能"表单对应此接口
+- 模板：复用 `POST /api/agent/templates`——管理页"新建模板"表单
+  （name/description/caseShape/coverageRules/assertRules/examples）
+- 工具：仍为代码内新增 `ToolExecutor` 类自动注册；管理端仅启停
+
+### 已知修复
+
+- `agent_case_template` 的 `case_shape/coverage_rules/assert_rules/examples` 原为 JSON 列，
+  与自由文本语义不符导致创建模板报错；已改为 TEXT（init.sql + 线上库 ALTER 同步）
 
 ### 迁移
 

@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.agent.api;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.Data;
 import org.example.ai_study_notes.Pojo.Result;
 import org.example.ai_study_notes.agent.auth.AgentUserService;
 import org.example.ai_study_notes.agent.skill.AgentSkill;
@@ -14,13 +15,19 @@ import org.example.ai_study_notes.agent.tool.ToolRegistryEntryMapper;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 管理接口（admin）：工具启停管理。
@@ -78,6 +85,66 @@ public class AdminController {
         } catch (IllegalArgumentException e) {
             return Result.error(e.getMessage());
         }
+    }
+
+    @PostMapping("/skills")
+    public Result<Map<String, Object>> createSkill(@RequestBody CreateSkillRequest request) {
+        if (!userService.isAdmin()) {
+            return Result.error("无权限，仅管理员可访问");
+        }
+        try {
+            String name = sanitizeSkillName(request.getName());
+            Path root = skillRegistry.skillsRoot();
+            if (root == null) {
+                return Result.error("skills 目录不存在");
+            }
+            Path skillFile = root.resolve(name).resolve("SKILL.md");
+            if (Files.exists(skillFile)) {
+                return Result.error("技能已存在: " + name);
+            }
+            String description = request.getDescription() == null ? "" : request.getDescription().trim();
+            String content = request.getContent() == null ? "" : request.getContent().trim();
+            if (content.isEmpty()) {
+                return Result.error("技能正文不能为空");
+            }
+            Files.createDirectories(skillFile.getParent());
+            Files.writeString(skillFile, buildSkillMarkdown(name, description, content), StandardCharsets.UTF_8);
+            skillRegistry.refresh();
+            return Result.success(Map.of("name", name,
+                    "path", root.relativize(skillFile).toString().replace('\\', '/')));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (IOException e) {
+            return Result.error("技能创建失败: " + e.getMessage());
+        }
+    }
+
+    private String sanitizeSkillName(String raw) {
+        if (raw == null || !Pattern.matches("^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$", raw.trim())) {
+            throw new IllegalArgumentException("技能名只能包含字母/数字/下划线/连字符（1-64位）");
+        }
+        return raw.trim();
+    }
+
+    private String buildSkillMarkdown(String name, String description, String content) {
+        return "---\n"
+                + "name: " + singleLine(name) + "\n"
+                + "description: " + singleLine(description) + "\n"
+                + "enabled: true\n"
+                + "version: 1.0.0\n"
+                + "---\n\n"
+                + content + "\n";
+    }
+
+    private String singleLine(String text) {
+        return text == null ? "" : text.replace('\n', ' ').replace('\r', ' ').trim();
+    }
+
+    @Data
+    public static class CreateSkillRequest {
+        private String name;
+        private String description;
+        private String content;
     }
 
     private void persist(String name, boolean enabled) {

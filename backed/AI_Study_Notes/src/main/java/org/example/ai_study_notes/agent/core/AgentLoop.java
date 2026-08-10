@@ -20,6 +20,8 @@ import org.example.ai_study_notes.agent.session.ConversationService;
 import org.example.ai_study_notes.agent.session.MessageService;
 import org.example.ai_study_notes.agent.skill.AgentSkill;
 import org.example.ai_study_notes.agent.skill.SkillService;
+import org.example.ai_study_notes.agent.task.TaskPlan;
+import org.example.ai_study_notes.agent.task.TaskPlanService;
 import org.example.ai_study_notes.agent.tool.ToolContext;
 import org.example.ai_study_notes.agent.tool.ToolExecutionService;
 import org.example.ai_study_notes.agent.tool.ToolRegistry;
@@ -57,6 +59,7 @@ public class AgentLoop {
     private final AuditService auditService;
     private final RunRegistry runRegistry;
     private final KnowledgeService knowledgeService;
+    private final TaskPlanService taskPlanService;
     private final ObjectMapper objectMapper;
     private final AgentProperties properties;
 
@@ -76,6 +79,7 @@ public class AgentLoop {
                      AuditService auditService,
                      RunRegistry runRegistry,
                      KnowledgeService knowledgeService,
+                     TaskPlanService taskPlanService,
                      ObjectMapper objectMapper,
                      AgentProperties properties) {
         this.llmClient = llmClient;
@@ -94,6 +98,7 @@ public class AgentLoop {
         this.auditService = auditService;
         this.runRegistry = runRegistry;
         this.knowledgeService = knowledgeService;
+        this.taskPlanService = taskPlanService;
         this.objectMapper = objectMapper;
         this.properties = properties;
     }
@@ -149,11 +154,13 @@ public class AgentLoop {
                 : memoryService.injectable(userId, memoryQuery(conversationId));
         List<String> knowledge = userId == null ? java.util.List.of()
                 : knowledgeService.injectable(userId, memoryQuery(conversationId), 2048);
+        String taskPlan = userId == null ? ""
+                : taskPlanService.injectable(userId, conversationId);
         List<String> skillBodies = skillService.activeSkills(conversationId).stream()
                 .map(AgentSkill::getBody).toList();
         messages.add(LlmMessage.builder()
                 .role("system")
-                .content(systemPromptBuilder.build(memories, skillBodies, knowledge))
+                .content(systemPromptBuilder.build(memories, skillBodies, knowledge, taskPlan))
                 .build());
         messages.addAll(contextAssembler.toLlmMessages(conversationId));
 
@@ -287,6 +294,12 @@ public class AgentLoop {
                     stream.emit(EventType.TOOL_EXECUTION_END.value(), Map.of(
                             "toolCallId", call.getId(), "toolName", call.getName(),
                             "status", result.getStatus().value(), "durationMs", result.getDurationMs()));
+                    if (org.example.ai_study_notes.agent.contract.ToolResultMeta.Status.SUCCESS
+                            .equals(result.getStatus())
+                            && ("create_task_plan".equals(call.getName())
+                            || "update_task_plan".equals(call.getName()))) {
+                        emitTaskPlanMessage(conversationId, userId, stream, result);
+                    }
                 }
                 stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
                 if (awaitingConfirmation) {
@@ -397,6 +410,43 @@ public class AgentLoop {
             meta.put("reasoningContent", reasoningContent);
         }
         return meta;
+    }
+
+    /**
+     * 任务计划工具执行成功后，把计划以 task_plan 消息推给前端（稳定 messageId= tp-{taskId}，支持原地更新）。
+     */
+    private void emitTaskPlanMessage(Long conversationId, Long userId, ConversationEventStream stream,
+                                     ToolResult result) {
+        try {
+            if (!(result.getData() instanceof Map<?, ?> data)) {
+                return;
+            }
+            Object taskIdObj = data.get("taskId");
+            if (taskIdObj == null) {
+                return;
+            }
+            String taskId = String.valueOf(taskIdObj);
+            TaskPlan plan = taskPlanService.get(userId, taskId);
+            String messageId = "tp-" + taskId;
+            Map<String, Object> planPayload = Map.of(
+                    "messageId", messageId,
+                    "type", "task_plan",
+                    "taskId", plan.taskId(),
+                    "title", plan.title(),
+                    "status", plan.status(),
+                    "items", plan.items());
+            messageService.append(conversationId, "assistant", "task_plan",
+                    toJson(planPayload),
+                    toJson(Map.of("taskId", plan.taskId(), "status", plan.status())));
+            stream.emit(EventType.MESSAGE_START.value(), Map.of(
+                    "messageId", messageId, "role", "assistant", "type", "task_plan",
+                    "taskId", plan.taskId(), "status", plan.status()));
+            stream.emit(EventType.MESSAGE_UPDATE.value(), planPayload);
+            stream.emit(EventType.MESSAGE_END.value(), Map.of(
+                    "messageId", messageId, "type", "task_plan"));
+        } catch (Exception e) {
+            log.warn("任务计划消息推送失败: {}", e.getMessage());
+        }
     }
 
     private String toJson(Object value) {

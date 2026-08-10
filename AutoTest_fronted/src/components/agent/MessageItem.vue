@@ -65,6 +65,20 @@
       </table>
     </div>
 
+    <!-- 任务计划 -->
+    <div v-else-if="msg.type === 'task_plan'" class="plan-card">
+      <div class="plan-head">
+        <span class="plan-title">📋 {{ msg.title || '任务计划' }}</span>
+        <el-tag :type="planTagType" size="small">{{ msg.status }}</el-tag>
+      </div>
+      <ul class="plan-list">
+        <li v-for="(item, i) in msg.items" :key="i" :class="{ done: item.checked }">
+          <span class="plan-check">{{ item.checked ? '✅' : '⬜' }}</span>
+          <span>{{ item.text }}</span>
+        </li>
+      </ul>
+    </div>
+
     <!-- 系统 -->
     <div v-else-if="msg.type === 'system'" class="sys-msg">{{ msg.content }}</div>
   </div>
@@ -91,6 +105,10 @@ export default {
       const s = String(this.msg.status || '')
       const m = s.match(/\(([^)]+)\)/)
       return m ? m[1] : ''
+    },
+    planTagType() {
+      const map = { done: 'success', blocked: 'warning', failed: 'danger', in_progress: 'primary' }
+      return map[this.msg.status] || 'info'
     }
   }
 }
@@ -213,6 +231,44 @@ export default {
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 11px;
+}
+.plan-card {
+  max-width: 78%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid #8B5CF6;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.plan-title {
+  font-weight: 600;
+}
+.plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.plan-list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-body);
+}
+.plan-list li.done {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+.plan-check {
+  flex: none;
 }
 .sys-msg {
   color: var(--danger);

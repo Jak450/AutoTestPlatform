@@ -85,6 +85,31 @@ public class MemoryService {
     }
 
     /**
+     * 合并同主题偏好：把新内容并入已有记忆（内容追加 + 版本 +1），减少冗余主题。
+     */
+    public MemoryEntry merge(Long userId, String targetKey, String newContent) {
+        if (targetKey == null || targetKey.isBlank() || newContent == null || newContent.isBlank()) {
+            throw new IllegalArgumentException("合并目标与内容不能为空");
+        }
+        MemoryEntry existing = findByKey(userId, targetKey);
+        if (existing == null) {
+            throw new IllegalArgumentException("目标记忆不存在: " + targetKey);
+        }
+        String merged = existing.getContentMd() == null ? "" : existing.getContentMd();
+        if (!merged.contains(newContent)) {
+            merged = merged.isBlank() ? newContent : merged + "；" + newContent;
+            if (merged.length() > 500) {
+                merged = merged.substring(0, 500) + "…";
+            }
+        }
+        existing.setContentMd(merged);
+        existing.setVersion((existing.getVersion() == null ? 1 : existing.getVersion()) + 1);
+        existing.setConfirmed(1);
+        memoryMapper.updateById(existing);
+        return existing;
+    }
+
+    /**
      * 保存未确认的自动提炼候选（confirmed=0，不参与注入）。
      */
     public MemoryEntry saveCandidate(Long userId, String key, String content) {

@@ -79,6 +79,13 @@ public class AgentSkillRegistry {
         return skill == null || skill.isEnabled();
     }
 
+    /**
+     * 技能根目录（供管理端新建技能写入 SKILL.md 使用）。
+     */
+    public Path skillsRoot() {
+        return resolveSkillsRoot(properties.getSkillsDir());
+    }
+
     public void setEnabled(String name, boolean enabled) {
         if (!skills.containsKey(name)) {
             throw new IllegalArgumentException("技能不存在: " + name);

@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 自动提炼候选记忆：run 结束后从对话历史提炼偏好/约定，存为未确认候选（confirmed=0）。
+ * 自动提炼记忆：run 结束后从对话历史提炼偏好/约定与知识，直接自动入库（无需用户确认）。
  */
 @Slf4j
 @Component
@@ -39,7 +39,13 @@ public class MemoryExtractor {
             - append：与知识库某条文档同主题（相关补充），追加到该文档（targetTitle 填其标题）；
             - skip：与知识库某条文档内容重复，不入库。
             preference 格式：
-            {"type": "preference", "key": "snake_case 键名", "content": "一句话描述"}
+            {"type": "preference", "key": "snake_case 键名", "content": "一句话描述",
+             "action": "create | merge | skip", "targetKey": "仅 action=merge 时填写，必须是上面已有偏好记忆的 key"}
+            其中：
+            - create：新主题，知识库/记忆没有相关条目，新建；
+            - merge：与已有某条偏好记忆同主题（如都是超时/命名/环境类约定），合并进该条
+              （targetKey 填其 key），不要新建重复主题；
+            - skip：与已有记忆内容重复，不入库。
             没有可提炼的内容就输出 []。不要输出其他文字。
             """;
 
@@ -61,7 +67,9 @@ public class MemoryExtractor {
         if (userId == null || extractedConversations.contains(conversationId)) {
             return;
         }
-        if (historyTail == null || historyTail.length() < 200) {
+        // 阈值不宜过高：偏好/约定往往一句话就能说清（如"超时统一 30 秒"），
+        // 历史过短会漏提炼；60 字符仍可跳过"你好/谢谢"等无信息量对话
+        if (historyTail == null || historyTail.length() < 60) {
             return;
         }
         try {
@@ -82,6 +90,23 @@ public class MemoryExtractor {
                     }
                     prompt.append("- [").append(doc.category()).append("] ")
                             .append(doc.title()).append(": ").append(snippet).append('\n');
+                }
+            }
+            java.util.List<MemoryEntry> confirmedPrefs = memoryService.list(userId, null).stream()
+                    .filter(e -> e.getConfirmed() != null && e.getConfirmed() == 1)
+                    .toList();
+            if (!confirmedPrefs.isEmpty()) {
+                prompt.append("\n\n已有偏好记忆（判断 preference 的 action 时参考，最多列出 10 条）：\n");
+                int count = 0;
+                for (MemoryEntry pref : confirmedPrefs) {
+                    if (count++ >= 10) {
+                        break;
+                    }
+                    String snippet = pref.getContentMd();
+                    if (snippet != null && snippet.length() > 80) {
+                        snippet = snippet.substring(0, 80) + "…";
+                    }
+                    prompt.append("- [").append(pref.getMemKey()).append("] ").append(snippet).append('\n');
                 }
             }
             String raw = aiClient.chat(prompt.toString(), historyTail);
@@ -143,17 +168,39 @@ public class MemoryExtractor {
                 if (isBlank(key) || isBlank(content) || "null".equals(key) || "null".equals(content)) {
                     continue;
                 }
+                String action = String.valueOf(candidate.getOrDefault("action", "create"));
+                if ("skip".equals(action)) {
+                    log.info("偏好重复，跳过入库: {}", key.trim());
+                    continue;
+                }
+                if ("merge".equals(action)) {
+                    String targetKey = String.valueOf(candidate.getOrDefault("targetKey", ""));
+                    try {
+                        MemoryEntry merged = memoryService.merge(userId, targetKey.trim(), content.trim());
+                        if (merged != null) {
+                            savedPreferences++;
+                            log.info("偏好已合并到已有记忆: {} <- {}", targetKey.trim(), key.trim());
+                        }
+                        continue;
+                    } catch (IllegalArgumentException e) {
+                        log.info("merge 目标不存在，退回新建: {}", e.getMessage());
+                    }
+                }
                 try {
-                    MemoryEntry entry = memoryService.saveCandidate(userId, key.trim(), content.trim());
+                    // 偏好与知识一致：自动提炼直接入库（confirmed=1），同名跳过避免覆盖
+                    MemoryEntry entry = memoryService.save(userId, key.trim(), content.trim(),
+                            java.util.List.of("auto"), false, conversationId);
                     if (entry != null) {
                         savedPreferences++;
                     }
+                } catch (IllegalArgumentException e) {
+                    log.info("偏好自动入库跳过（已存在或内容无效）: {}", e.getMessage());
                 } catch (Exception e) {
-                    log.warn("偏好候选保存失败，继续处理其余条目: {}", e.getMessage());
+                    log.warn("偏好自动入库失败，继续处理其余条目: {}", e.getMessage());
                 }
             }
             extractedConversations.add(conversationId);
-            log.info("会话 {} 自动提炼候选：偏好 {} 条，知识 {} 条", conversationId, savedPreferences, savedKnowledge);
+            log.info("会话 {} 自动提炼：偏好 {} 条，知识 {} 条", conversationId, savedPreferences, savedKnowledge);
         } catch (Exception e) {
             log.warn("记忆自动提炼失败 conversationId={}: {}", conversationId, e.getMessage());
         }

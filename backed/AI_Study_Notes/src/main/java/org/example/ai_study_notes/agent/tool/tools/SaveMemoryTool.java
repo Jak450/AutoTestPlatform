@@ -39,7 +39,7 @@ public class SaveMemoryTool implements ToolExecutor {
                                 "tags", Map.of("type", "array", "items", Map.of("type", "string")),
                                 "overwrite", Map.of("type", "boolean", "description", "是否覆盖已有记忆")),
                         "required", List.of("key", "content")))
-                .permission(ToolPermission.CONFIRM_WRITE)
+                .permission(ToolPermission.AUTO_WRITE)
                 .category("记忆")
                 .activeByDefault(true)
                 .version("1.0.0")
