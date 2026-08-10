@@ -54,7 +54,7 @@
         <el-table-column prop="url" label="URL" width="300" />
         <el-table-column prop="method" label="请求方法" width="100">
           <template #default="{ row }">
-            <el-tag :type="getMethodTagType(row.method)">{{ row.method }}</el-tag>
+            <MethodBadge :method="row.method" />
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" />
@@ -69,10 +69,10 @@
         <div class="card-header">
           <span>执行结果</span>
           <div class="result-stats">
-            <el-tag type="primary">总数: {{ batchResults.total }}</el-tag>
-            <el-tag type="success">成功: {{ batchResults.success }}</el-tag>
-            <el-tag type="danger">失败: {{ batchResults.failed }}</el-tag>
-            <el-tag type="info">总耗时: {{ batchResults.totalTime }} ms</el-tag>
+            <StatCard label="总数" :value="batchResults.total || 0" />
+            <StatCard label="成功" :value="batchResults.success || 0" color="var(--success)" />
+            <StatCard label="失败" :value="batchResults.failed || 0" color="var(--danger)" />
+            <StatCard label="总耗时" :value="(batchResults.totalTime || 0) + ' ms'" />
           </div>
         </div>
       </template>
@@ -109,7 +109,7 @@
     </el-card>
     
     <!-- 测试报告查询与导出区域 -->
-    <div class="report-section" style="margin-top: 20px; background-color: #f5f7fa; border-radius: 6px; padding: 15px;">
+    <div class="report-section" style="margin-top: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 15px;">
       <h3 style="margin-bottom: 15px; font-weight: 500;">测试报告管理</h3>
       <el-row :gutter="20">
         <el-col :span="8">
@@ -394,10 +394,13 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import StatCard from '../components/ui/StatCard.vue'
+import MethodBadge from '../components/ui/MethodBadge.vue'
 
 
 export default {
   name: 'BatchExecute',
+  components: { StatCard, MethodBadge },
   setup() {
     const projects = ref([])
     const useCases = ref([])
@@ -987,8 +990,11 @@ export default {
 }
 
 .result-stats {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 /* 渐变色进度条样式 */

@@ -21,10 +21,14 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="用例名称" />
         <el-table-column prop="projectName" label="所属项目" width="140" />
-        <el-table-column prop="url" label="目标URL" width="200" show-overflow-tooltip />
+        <el-table-column prop="url" label="目标URL" width="220">
+          <template #default="{ row }">
+            <span class="mono">{{ row.url }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="browser" label="浏览器" width="100">
           <template #default="{ row }">
-            <el-tag size="small">{{ row.browser }}</el-tag>
+            <span class="mono">{{ row.browser }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="viewport" label="窗口大小" width="120" />

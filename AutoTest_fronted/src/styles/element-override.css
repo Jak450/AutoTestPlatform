@@ -72,3 +72,36 @@
 .el-message-box {
   border-radius: 8px;
 }
+
+/* 卡片统一为蓝图面板 */
+.el-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
+}
+.el-card__header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.card-header > span:first-child {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink-strong);
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.el-table {
+  --el-table-header-text-color: var(--ink-muted);
+  border-radius: 4px;
+}

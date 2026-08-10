@@ -1,39 +1,23 @@
 <template>
-  <div class="projects-container">
-    <el-card class="project-card">
-      <template #header>
-        <div class="card-header">
-          <span>项目列表</span>
-          <el-button type="primary" size="small" @click="showAddDialog">
-            <el-icon><i-ep-plus /></el-icon>
-            添加项目
-          </el-button>
-        </div>
-      </template>
+  <div class="projects-page">
+    <PageHeader title="项目管理" description="API 测试项目">
+      <el-button type="primary" @click="showAddDialog">新建项目</el-button>
+    </PageHeader>
 
-      <el-table :data="projects" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="项目名称" />
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" size="small" @click="editProject(row)">
-              编辑
-            </el-button>
-            <el-button type="danger" size="small" @click="deleteProject(row.id)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <div class="project-grid">
+      <div v-for="p in projects" :key="p.id" class="project-card">
+        <div class="project-name">{{ p.name }}</div>
+        <div class="project-meta mono">ID {{ p.id }}</div>
+        <div class="project-actions">
+          <el-button size="small" @click="editProject(p)">编辑</el-button>
+          <el-button size="small" type="danger" plain @click="deleteProject(p.id)">删除</el-button>
+        </div>
+      </div>
+      <EmptyState v-if="!projects.length" title="还没有项目" hint="点击右上角新建第一个项目" />
+    </div>
 
     <!-- 添加/编辑项目对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="400px"
-      @close="closeDialog"
-    >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="400px" @close="closeDialog">
       <el-form :model="projectForm" :rules="rules" ref="projectFormRef">
         <el-form-item label="项目名称" prop="name">
           <el-input v-model="projectForm.name" placeholder="请输入项目名称" />
@@ -53,9 +37,12 @@
 import { ref, onMounted, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import PageHeader from '../components/ui/PageHeader.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
 
 export default {
   name: 'Projects',
+  components: { PageHeader, EmptyState },
   setup() {
     const projects = ref([])
     const dialogVisible = ref(false)
@@ -72,7 +59,6 @@ export default {
       ]
     }
 
-    // 获取项目列表
     const fetchProjects = async () => {
       try {
         const response = await axios.get('/projects')
@@ -83,7 +69,6 @@ export default {
       }
     }
 
-    // 显示添加对话框
     const showAddDialog = () => {
       dialogTitle.value = '添加项目'
       projectForm.id = null
@@ -91,7 +76,6 @@ export default {
       dialogVisible.value = true
     }
 
-    // 编辑项目
     const editProject = (row) => {
       dialogTitle.value = '编辑项目'
       projectForm.id = row.id
@@ -99,7 +83,6 @@ export default {
       dialogVisible.value = true
     }
 
-    // 关闭对话框
     const closeDialog = () => {
       dialogVisible.value = false
       if (projectFormRef.value) {
@@ -107,18 +90,15 @@ export default {
       }
     }
 
-    // 提交表单
     const submitForm = async () => {
       if (!projectFormRef.value) return
       await projectFormRef.value.validate(async (valid) => {
         if (valid) {
           try {
             if (projectForm.id) {
-              // 更新项目
               await axios.put(`/projects/${projectForm.id}`, projectForm)
               ElMessage.success('更新项目成功')
             } else {
-              // 添加项目
               await axios.post('/projects', projectForm)
               ElMessage.success('添加项目成功')
             }
@@ -132,7 +112,6 @@ export default {
       })
     }
 
-    // 删除项目
     const deleteProject = async (id) => {
       try {
         await ElMessageBox.confirm('确定要删除该项目吗？', '警告', {
@@ -144,7 +123,6 @@ export default {
         ElMessage.success('删除项目成功')
         fetchProjects()
       } catch (error) {
-        // 用户取消操作不显示错误
         if (error !== 'cancel') {
           console.error('删除项目失败:', error)
           ElMessage.error('删除项目失败')
@@ -152,7 +130,6 @@ export default {
       }
     }
 
-    // 初始化
     onMounted(() => {
       fetchProjects()
     })
@@ -175,18 +152,43 @@ export default {
 </script>
 
 <style scoped>
-.projects-container {
-  padding: 20px;
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .project-card {
-  margin-bottom: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
+  padding: 18px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.card-header {
+.project-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(23, 35, 59, 0.1);
+}
+
+.project-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink-strong);
+}
+
+.project-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.project-actions {
+  margin-top: 14px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 8px;
 }
 
 .dialog-footer {

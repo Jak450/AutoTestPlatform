@@ -40,17 +40,11 @@
               @change="handleFileChange"
               style="display: none;"
             />
-            <el-button type="primary" @click="selectFile">
-              <el-icon><i-ep-upload /></el-icon>
-              选择文件
-            </el-button>
-            <span v-if="uploadFileName" style="margin-left: 10px; color: #67c23a;">
-              <el-icon><i-ep-document /></el-icon>
-              {{ uploadFileName }}
-            </span>
-            <span v-else style="margin-left: 10px; color: #909399; font-size: 12px;">
-              支持 Markdown、PDF、Word 格式
-            </span>
+            <div class="upload-zone" @click="selectFile">
+              <div class="upload-icon">⬆</div>
+              <div class="upload-text">{{ uploadFileName || '点击选择需求文档' }}</div>
+              <div class="upload-hint">支持 Markdown、PDF、Word（.md / .pdf / .doc / .docx）</div>
+            </div>
           </el-form-item>
           <el-form-item>
             <el-button type="success" @click="startAnalysis" :loading="analyzing">
@@ -448,7 +442,12 @@ export default {
 .qa-radio { display: block; margin: 4px 0; }
 
 .progress-section { margin: 20px 0; }
-.stream-output { margin-top: 16px; background: #1e1e1e; border-radius: 8px; padding: 12px; }
+.stream-output { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .stream-label { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
-.stream-text { color: #c9d1d9; font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+.stream-text { color: var(--mono-ink); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; margin: 0; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+.upload-zone { width: 100%; border: 1.5px dashed var(--line); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; background: var(--panel); transition: border-color 0.15s ease; }
+.upload-zone:hover { border-color: var(--primary); }
+.upload-icon { font-size: 22px; color: var(--primary); }
+.upload-text { margin-top: 6px; font-weight: 500; color: var(--ink-strong); }
+.upload-hint { margin-top: 4px; font-size: 12px; color: var(--ink-muted); }
 </style>
