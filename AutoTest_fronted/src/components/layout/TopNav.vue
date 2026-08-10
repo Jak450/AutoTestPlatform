@@ -1,7 +1,7 @@
 <template>
   <header class="topnav">
     <div class="topnav-left">
-      <button class="burger" @click="$emit('toggle-menu')" aria-label="菜单">☰</button>
+      <button class="burger" @click="drawerVisible = true" aria-label="菜单">☰</button>
       <Logo @click="$router.push('/agent')" style="cursor:pointer" />
     </div>
     <nav class="topnav-nav">
@@ -35,6 +35,22 @@
       <el-button size="small" @click="logout">退出</el-button>
     </div>
   </header>
+
+  <!-- 移动端抽屉菜单 -->
+  <el-drawer v-model="drawerVisible" title="导航" size="240px">
+    <div class="drawer-nav">
+      <router-link to="/agent" class="drawer-item" @click="drawerVisible = false">AI Agent</router-link>
+      <router-link to="/projects" class="drawer-item" @click="drawerVisible = false">接口 · 项目管理</router-link>
+      <router-link to="/use-cases" class="drawer-item" @click="drawerVisible = false">接口 · 用例管理</router-link>
+      <router-link to="/api-test" class="drawer-item" @click="drawerVisible = false">接口 · API 测试</router-link>
+      <router-link to="/batch-execute" class="drawer-item" @click="drawerVisible = false">接口 · 批量执行</router-link>
+      <router-link to="/ui-test" class="drawer-item" @click="drawerVisible = false">UI · 测试工作台</router-link>
+      <router-link to="/ui-projects" class="drawer-item" @click="drawerVisible = false">UI · 项目管理</router-link>
+      <router-link to="/ui-use-cases" class="drawer-item" @click="drawerVisible = false">UI · 用例管理</router-link>
+      <router-link to="/ui-batch-execute" class="drawer-item" @click="drawerVisible = false">UI · 批量执行</router-link>
+      <router-link to="/ai-requirement" class="drawer-item" @click="drawerVisible = false">AI 需求分析</router-link>
+    </div>
+  </el-drawer>
 </template>
 
 <script>
@@ -45,7 +61,8 @@ export default {
   components: { Logo },
   data() {
     return {
-      currentUser: JSON.parse(localStorage.getItem('user') || 'null')
+      currentUser: JSON.parse(localStorage.getItem('user') || 'null'),
+      drawerVisible: false
     }
   },
   methods: {
@@ -119,6 +136,26 @@ export default {
 
 .caret {
   font-size: 11px;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--ink-body);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.drawer-item:hover,
+.drawer-item.router-link-active {
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .topnav-right {
