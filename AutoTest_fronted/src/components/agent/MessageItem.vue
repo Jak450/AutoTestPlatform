@@ -18,7 +18,8 @@
           <span v-if="durationText" class="mono duration">{{ durationText }}</span>
         </div>
       </div>
-      <div v-if="msg.argsText" class="tool-body mono">{{ msg.argsText }}</div>
+      <!-- 不展示原始参数 JSON，避免把函数调用直接暴露给用户 -->
+      <div v-if="msg.status === 'running'" class="tool-body">正在执行…</div>
     </div>
 
     <!-- 工具结果 -->

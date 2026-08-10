@@ -4,6 +4,7 @@ import org.example.ai_study_notes.agent.tool.ToolContext;
 import org.example.ai_study_notes.agent.tool.ToolResult;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -31,9 +32,13 @@ public class ToolResultSanitizationMiddleware implements Middleware {
         } else if (result.getData() instanceof Map<?, ?> rawMap) {
             Object content = rawMap.get("content");
             if (content instanceof String text) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> map = (Map<String, Object>) rawMap;
+                // 工具返回的 Map 可能是不可变 Map（如 Map.of），必须拷贝后再修改
+                Map<String, Object> map = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                    map.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
                 map.put("content", sanitize(text));
+                result.setData(map);
             }
         }
     }
