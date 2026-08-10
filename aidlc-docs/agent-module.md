@@ -137,11 +137,12 @@ agent:
 
 - 流式输出为逐 token（SSE stream=true + 增量 message_update），思考内容（reasoning_content）仅用于回传，未在前端展示
 - 确认后同一批多个工具调用仅保留首个待确认调用
-- 事件缓冲在 agent_end 后清空；run 极快完成时迟到的 SSE 连接靠前端 syncRunState 拉取详情兜底
+- 事件缓冲已 Redis 化（`agent:events:{conversationId}`，TTL 7 天），run 结束后清空；
+  迟到的连接靠前端 syncRunState 拉取详情兜底
 - 中间件 ReadBeforeWrite 为简化版（写前需本会话最近有查询标记）
 - Agent 模型层为自研 OpenAI 兼容客户端（Apache HttpClient 直接调 /chat/completions），
   支持 DeepSeek thinking 模式 reasoning_content 回传；LangChain4j 仅保留给旧 AI 模块与单轮生成
-- 会话内已加载的技能状态（SkillService）为内存态，重启后需重新 load_skill
+- 技能加载状态已持久化到 Redis（`agent:conv:{conversationId}:skills`），重启不丢
 
 ### 记忆存储位置
 
@@ -156,14 +157,62 @@ agent:
 | 激活的用例模板 | Redis `agent:conv:{conversationId}:activeTemplate`（TTL 7 天） |
 | 待确认的工具调用 | Redis `agent:confirm:{confirmationId}:pending`（TTL 10 分钟） |
 
-## 9. 验证
+## 9. A/B 修复与增强（2026-08-10）
+
+- A1 批量执行报告落库：`AgentReportRecorder` 显式补录 `test_case_report`
+- A2 会话删除/过期清理附件（记录 + 磁盘文件）
+- A3 生产部署参数：`deploy.yml` 传 `DEEPSEEK_API_KEY/JWT_SECRET/ADMIN_INIT_PASSWORD`，创建 `agent-data`
+- A4 流式重试只在发送阶段；流中途失败不重发
+- A5 工具输出预算覆盖 Map 类型（大文档截断）
+- A6 流式请求可取消（sendAsync + 轮询，取消立即中断）
+- A7 前端确认卡 handled 状态在刷新后保留
+- A8 旧 AI 模块（`ai.ark.*`）切到 DeepSeek 配置
+- A9 契约 JSON 与代码枚举严格双向校验（补 `error`/`awaiting_confirmation`）
+- B1 自动压缩接线（增量 ≥40 条才重复压缩）
+- B2 记忆相关性 Top-N 注入 + 自动提炼候选（未确认，资源面板一键确认）
+- B3 中间件补齐：ToolResultSanitization / TerminalResponse（空回复重试）/ TokenBudget（可配置）
+- B4 技能热重载 + 激活状态 Redis 持久化
+- B5 可观测性：工具审计、token 计量（agent_end 事件带 tokens）、SSE 响应头 `X-Trace-Id`、事件 Redis 化
+- B6 管理端：工具/技能启停 + 全量模板管理 API，前端 `views/Admin.vue`（admin）
+- B8 流式"思考中…"指示
+
+## 10. 用例草稿试跑与评测
+
+- `trial_run_cases` 工具：对草稿真实执行（不保存），支持 `repeat`（每条 N 次）与 `sampleSize`（随机抽样），
+  输出 `usableCases / flakyCases / executableRuns / assertPassedRuns` 分类报告；执行需用户确认
+- 评测脚手架 `agent-eval/`：
+  - `tasks.jsonl`：9 个真实任务（查询/报告/记忆/模板/写入确认/文档生成/执行确认/试跑链路）
+  - `run-eval.mjs --rounds N`：多轮跑真实链路，输出按任务通过率分布与失败明细（支持 `EVAL_ONLY` 过滤）
+  - `report.md`：评测报告；当前基线 94%（9 任务 × 2 轮 = 18 轮 17/18）
+- 常见回归兜底：改完 Agent 后跑 `node agent-eval/run-eval.mjs --rounds 2`
+
+## 11. 前端重设计（AutoTest·Blueprint 浅色蓝图）
+
+- 设计文档：`docs/superpowers/specs/2026-08-10-frontend-redesign-design.md`
+- 实现计划：`docs/superpowers/plans/2026-08-10-frontend-redesign.md`
+- 设计 Token/全局样式/Element 换肤：`AutoTest_fronted/src/styles/`
+- 自建组件：`components/ui/*`（Logo/StatusStamp/MethodBadge/StatCard/PageHeader/EmptyState）、
+  `components/layout/TopNav.vue`（含移动端抽屉）、`components/agent/*`（会话列表/消息/资源面板）
+- 页面：登录页、Agent 三栏页（`views/Agent.vue`）、项目卡片式、用例/批量/报告/AI 需求分析换肤、`views/Admin.vue`
+- 注意：Agent.vue 的 SSE/上传/确认等逻辑全部保留并组件化；工具卡片不展示原始参数 JSON
+
+## 12. Git 与运行状态
+
+- 分支 `codex/agent`：已 push 一次（`origin/codex/agent` 存在）；本地另有 5 个未推送提交
+- 本地运行：后端 8080（dev + `DEEPSEEK_API_KEY`）、前端 5173、MySQL 3306、Redis 6379
+- 后端测试当前 18 个全部通过；前端 `npm run build` 通过
+- 评测任务偶发不稳定项：`trial_run_generated` 曾在单轮出现生成后不试跑（模型随机性），多轮评测可见
+
+## 13. 验证
 
 ```powershell
 # 后端
-mvn test          # 14 个测试通过（契约/Schema/JWT/上下文加载）
+mvn test          # 18 个测试通过（契约/Schema/JWT/上下文加载/中间件顺序/草稿试跑）
 # 前端
 npm install
 npm run build
+# Agent 评测（可选）
+node agent-eval/run-eval.mjs --rounds 2
 ```
 
 运行前提：MySQL（导入 `backed/init.sql`）、Redis、`DEEPSEEK_API_KEY` 环境变量；测试默认账号 admin/12345678。

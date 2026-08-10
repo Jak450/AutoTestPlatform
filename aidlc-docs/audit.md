@@ -157,3 +157,34 @@
 - `skills/register.json` is absent; `SkillLoader` reads `skills/*/SKILL.md` frontmatter directly.
 - Idempotency is request hash based and has no token endpoint.
 - Secret management scripts exist; AI-DLC docs intentionally avoid recording raw secrets.
+
+---
+
+### Agent 模块全量开发（P0/P1/P2）
+**Timestamp**: 2026-08-10
+**User Input**: 根据 docs/agent-design 五份文档开发可交互测试 Agent
+**Completed**:
+- P0：JWT 认证、会话、SSE 流式、AgentLoop、工具系统、确认流程、前端登录+Agent 页
+- P1：文件、用例生成、模板、记忆、压缩、中间件、技能
+- P2：管理 API、审计、契约校验、部署文件
+- 模型层自研 OpenAI 兼容客户端（DeepSeek thinking reasoning 回传）
+
+### A/B 缺陷修复与未实现功能补齐
+**Timestamp**: 2026-08-10
+**Completed**: 批量执行报告落库、附件清理、生产部署参数、流式重试/取消、大文档预算、契约同步、
+自动压缩接线、记忆相关性检索+自动提炼、中间件补齐、技能 Redis 持久化、事件 Redis 化、
+审计与 token 计量、管理端页面、思考指示、确认卡状态保留
+
+### 草稿试跑与评测体系
+**Timestamp**: 2026-08-10
+**Completed**: `trial_run_cases`（多轮重跑 + 随机抽样 + flaky 标记）；`agent-eval/` 多轮评测
+（9 任务基线 94%）；评测驱动修复解析工具不可变 Map 回归
+
+### 前端全站重设计（AutoTest·Blueprint）
+**Timestamp**: 2026-08-10
+**Completed**: 设计 Token、顶部导航、登录页、Agent 三栏页、8 个数据页换肤、系统管理页；
+设计文档与实现计划落 docs/superpowers
+
+### Git 推送
+**Timestamp**: 2026-08-10
+**Detail**: 创建并推送 `codex/agent` 分支；当前本地另有 5 个未推送提交
