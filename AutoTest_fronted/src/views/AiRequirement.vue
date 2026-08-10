@@ -246,7 +246,10 @@ export default {
 
           const response = await fetch('/api/ai/analyze-requirement-stream', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            },
             body: JSON.stringify({
               fileName: uploadFile.value.name,
               content: text,

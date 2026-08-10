@@ -6,7 +6,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@MapperScan("org.example.ai_study_notes.mapper")
+@MapperScan({
+        "org.example.ai_study_notes.mapper",
+        "org.example.ai_study_notes.agent.auth",
+        "org.example.ai_study_notes.agent.session",
+        "org.example.ai_study_notes.agent.confirmation"
+})
 @EnableScheduling
 public class AiStudyNotesApplication {
 

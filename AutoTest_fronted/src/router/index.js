@@ -6,6 +6,22 @@ const routes = [
     redirect: '/projects'
   },
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: {
+      title: '登录'
+    }
+  },
+  {
+    path: '/agent',
+    name: 'Agent',
+    component: () => import('../views/Agent.vue'),
+    meta: {
+      title: 'AI Agent'
+    }
+  },
+  {
     path: '/ai-requirement',
     name: 'AiRequirement',
     component: () => import('../views/AiRequirement.vue'),
@@ -88,7 +104,15 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 自动化测试平台` : '自动化测试平台'
-  next()
+  // 登录守卫：未登录只能访问登录页
+  const token = localStorage.getItem('token')
+  if (to.path !== '/login' && !token) {
+    next('/login')
+  } else if (to.path === '/login' && token) {
+    next('/')
+  } else {
+    next()
+  }
 })
 
 export default router

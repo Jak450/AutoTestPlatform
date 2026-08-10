@@ -2,7 +2,7 @@
   <div class="app-container">
     <el-container class="main-container">
       <!-- 侧边栏 -->
-      <el-aside width="240px" class="sidebar">
+      <el-aside v-if="!isLoginPage" width="240px" class="sidebar">
         <div class="logo">
           <h2>自动化测试平台</h2>
         </div>
@@ -22,6 +22,10 @@
             <el-menu-item index="/ai-requirement">
               <el-icon><i-ep-document /></el-icon>
               <span>AI需求分析</span>
+            </el-menu-item>
+            <el-menu-item index="/agent">
+              <el-icon><i-ep-chat-dot-round /></el-icon>
+              <span>AI Agent</span>
             </el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="interface-test">
@@ -73,10 +77,11 @@
 
       <!-- 主内容区 -->
       <el-container>
-        <el-header height="60px" class="header">
+        <el-header v-if="!isLoginPage" height="60px" class="header">
           <div class="header-title">{{ pageTitle }}</div>
           <div class="header-actions">
-            <!-- 刷新按钮已删除 -->
+            <span class="header-user" v-if="currentUser">{{ currentUser.displayName || currentUser.username }}</span>
+            <el-button size="small" @click="logout" v-if="currentUser">退出登录</el-button>
           </div>
         </el-header>
         <el-main class="content">
@@ -93,14 +98,18 @@
 
 <script>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 
 export default {
   name: 'App',
   setup() {
     const route = useRoute()
+    const router = useRouter()
     const activeMenu = ref('/projects')
     const pageTitle = ref('项目管理')
+    const isLoginPage = computed(() => route.path === '/login')
+    const currentUser = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 
     // 监听路由变化
     watch(
@@ -109,6 +118,8 @@ export default {
         activeMenu.value = newPath
         // 根据路由设置页面标题
         const titleMap = {
+          '/agent': 'AI Agent',
+          '/ai-requirement': 'AI需求分析',
           '/projects': '项目管理',
           '/use-cases': '用例管理',
           '/api-test': 'API测试',
@@ -123,9 +134,24 @@ export default {
       { immediate: true }
     )
 
+    const logout = async () => {
+      try {
+        await axios.post('/auth/logout')
+      } catch (e) {
+        // 登出接口失败不阻塞本地登出
+      }
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      currentUser.value = null
+      router.push('/login')
+    }
+
     return {
       activeMenu,
-      pageTitle
+      pageTitle,
+      isLoginPage,
+      currentUser,
+      logout
     }
   }
 }
@@ -322,6 +348,11 @@ html, body {
   font-size: 18px;
   font-weight: 500;
   color: #262626;
+}
+
+.header-user {
+  color: #595959;
+  font-size: 14px;
 }
 
 .content {

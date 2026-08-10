@@ -12,3 +12,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Agent 模块本地数据（附件、工具输出等）
+agent-data/

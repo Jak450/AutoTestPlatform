@@ -9,6 +9,30 @@ import axios from 'axios'
 axios.defaults.baseURL = '/api'
 axios.defaults.headers.post['Content-Type'] = 'application/json'
 
+// 请求拦截器：附加 JWT token
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// 响应拦截器：401 时清除登录态并跳转登录页
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (router.currentRoute.value.path !== '/login') {
+        router.push('/login')
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 const app = createApp(App)
 
 app.use(ElementPlus)
