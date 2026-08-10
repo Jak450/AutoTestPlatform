@@ -122,7 +122,7 @@
             <version>1.3.0</version>
         </dependency>
 
-        <!-- JWT -->
+        <!-- JWT 认证 -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -141,24 +141,29 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- BCrypt -->
+        <!-- BCrypt 密码加密（仅使用 spring-security-crypto，不引入完整 Security 框架） -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
-        <!-- Apache POI：Word 解析 -->
+        <!-- 文档解析：PDF -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.30</version>
+        </dependency>
+
+        <!-- 文档解析：Word（.docx / .doc） -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
         </dependency>
-
-        <!-- PDF 解析 -->
         <dependency>
-            <groupId>org.apache.pdfbox</groupId>
-            <artifactId>pdfbox</artifactId>
-            <version>3.0.2</version>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
+            <version>5.2.5</version>
         </dependency>
 
         <!-- Selenium -->

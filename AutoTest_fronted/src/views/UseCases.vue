@@ -19,10 +19,14 @@
       <el-table :data="useCases" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="用例名称" />
-        <el-table-column prop="url" label="URL" width="300" />
+        <el-table-column prop="url" label="URL" width="300">
+          <template #default="{ row }">
+            <span class="mono">{{ row.url }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="method" label="请求方法" width="100">
           <template #default="{ row }">
-            <el-tag :type="getMethodTagType(row.method)">{{ row.method }}</el-tag>
+            <MethodBadge :method="row.method" />
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" />
@@ -96,9 +100,11 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import MethodBadge from '../components/ui/MethodBadge.vue'
 
 export default {
   name: 'UseCases',
+  components: { MethodBadge },
   setup() {
     const projects = ref([])
     const useCases = ref([])

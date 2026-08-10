@@ -54,7 +54,7 @@
         <el-table-column prop="url" label="URL" width="300" />
         <el-table-column prop="method" label="请求方法" width="100">
           <template #default="{ row }">
-            <el-tag :type="getMethodTagType(row.method)">{{ row.method }}</el-tag>
+            <MethodBadge :method="row.method" />
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" />
@@ -69,10 +69,10 @@
         <div class="card-header">
           <span>执行结果</span>
           <div class="result-stats">
-            <el-tag type="primary">总数: {{ batchResults.total }}</el-tag>
-            <el-tag type="success">成功: {{ batchResults.success }}</el-tag>
-            <el-tag type="danger">失败: {{ batchResults.failed }}</el-tag>
-            <el-tag type="info">总耗时: {{ batchResults.totalTime }} ms</el-tag>
+            <StatCard label="总数" :value="batchResults.total || 0" />
+            <StatCard label="成功" :value="batchResults.success || 0" color="var(--success)" />
+            <StatCard label="失败" :value="batchResults.failed || 0" color="var(--danger)" />
+            <StatCard label="总耗时" :value="(batchResults.totalTime || 0) + ' ms'" />
           </div>
         </div>
       </template>
@@ -109,7 +109,7 @@
     </el-card>
     
     <!-- 测试报告查询与导出区域 -->
-    <div class="report-section" style="margin-top: 20px; background-color: #f5f7fa; border-radius: 6px; padding: 15px;">
+    <div class="report-section" style="margin-top: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 15px;">
       <h3 style="margin-bottom: 15px; font-weight: 500;">测试报告管理</h3>
       <el-row :gutter="20">
         <el-col :span="8">
@@ -181,6 +181,13 @@
             <el-tag :type="scope.row.status === 'success' ? 'success' : scope.row.status === 'fail' ? 'danger' : 'warning'">
               {{ scope.row.status }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="AI分析" width="90">
+          <template #default="scope">
+            <el-button type="warning" size="small" @click="aiAnalyze(scope.row)" :loading="aiLoadingId === scope.row.id">
+              AI分析
+            </el-button>
           </template>
         </el-table-column>
         <el-table-column prop="duration" label="执行时长(ms)" width="120" />
@@ -282,17 +289,118 @@
       </el-tabs>
     </el-dialog>
 
+    <!-- AI分析结果对话框 -->
+    <el-dialog
+      v-model="aiAnalysisVisible"
+      title="AI 测试结果分析"
+      width="800px"
+      @close="handleAiClose"
+      top="5vh"
+    >
+      <div v-if="aiAnalysis" class="ai-analysis-container">
+        <!-- 结论头 -->
+        <div class="ai-verdict-header">
+          <el-tag :type="verdictTag" size="large" class="ai-verdict-tag">
+            {{ verdictLabel }}
+          </el-tag>
+          <span class="ai-confidence" :class="'confidence-' + (aiAnalysis.confidence || 'low')">
+            可信度: {{ confidenceLabel }}
+          </span>
+        </div>
+
+        <!-- 错误类型 -->
+        <div v-if="aiAnalysis.verdict !== 'passed'" class="ai-section">
+          <div class="ai-section-title">
+            <el-icon><i-ep-warning-filled /></el-icon>
+            错误类型
+          </div>
+          <el-tag :type="errorTypeTag" effect="plain">
+            {{ errorTypeLabel }}
+          </el-tag>
+        </div>
+
+        <!-- 根因分析 -->
+        <div v-if="aiAnalysis.rootCause" class="ai-section">
+          <div class="ai-section-title">
+            <el-icon><i-ep-search /></el-icon>
+            根因分析
+          </div>
+          <div class="ai-card-content">{{ aiAnalysis.rootCause }}</div>
+        </div>
+
+        <!-- 详细分析 -->
+        <div v-if="aiAnalysis.analysis" class="ai-section">
+          <div class="ai-section-title">
+            <el-icon><i-ep-document /></el-icon>
+            详细分析
+          </div>
+          <div class="ai-card-content">{{ aiAnalysis.analysis }}</div>
+        </div>
+
+        <!-- 修复建议 -->
+        <div v-if="aiAnalysis.suggestion" class="ai-section">
+          <div class="ai-section-title">
+            <el-icon><i-ep-tools /></el-icon>
+            修复建议
+          </div>
+          <div class="ai-card-content suggestion-text">{{ aiAnalysis.suggestion }}</div>
+        </div>
+
+        <!-- 原始数据 -->
+        <el-collapse style="margin-top: 16px;">
+          <el-collapse-item title="查看原始请求/响应数据" name="raw">
+            <div class="raw-data-grid">
+              <div class="raw-item">
+                <span class="raw-label">接口地址</span>
+                <span class="raw-value">{{ aiReportData?.apiUrl || '-' }}</span>
+              </div>
+              <div class="raw-item">
+                <span class="raw-label">HTTP方法</span>
+                <el-tag size="small" :type="methodTag2(aiReportData?.requestMethod)">{{ aiReportData?.requestMethod }}</el-tag>
+              </div>
+              <div class="raw-item">
+                <span class="raw-label">响应状态码</span>
+                <el-tag size="small" :type="aiReportData?.responseStatus < 400 ? 'success' : 'danger'">{{ aiReportData?.responseStatus }}</el-tag>
+              </div>
+              <div class="raw-item">
+                <span class="raw-label">执行耗时</span>
+                <span class="raw-value">{{ aiReportData?.duration ? aiReportData.duration + 'ms' : '-' }}</span>
+              </div>
+              <div class="raw-item full-width">
+                <span class="raw-label">请求体</span>
+                <pre class="raw-pre">{{ aiReportData?.requestBody || '(空)' }}</pre>
+              </div>
+              <div class="raw-item full-width">
+                <span class="raw-label">响应体</span>
+                <pre class="raw-pre">{{ aiReportData?.responseBody || '(空)' }}</pre>
+              </div>
+              <div class="raw-item full-width">
+                <span class="raw-label">断言结果</span>
+                <pre class="raw-pre">{{ aiReportData?.assertDetail || '(无断言)' }}</pre>
+              </div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+      <div v-else class="ai-loading">
+        <el-icon class="is-loading" :size="32"><i-ep-loading /></el-icon>
+        <p>AI 正在分析...</p>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import StatCard from '../components/ui/StatCard.vue'
+import MethodBadge from '../components/ui/MethodBadge.vue'
 
 
 export default {
   name: 'BatchExecute',
+  components: { StatCard, MethodBadge },
   setup() {
     const projects = ref([])
     const useCases = ref([])
@@ -322,6 +430,85 @@ export default {
     const statusFilter = ref('') // 状态筛选
     const reportLoading = ref(false) // 报告查询加载状态
     const reportData = ref([]) // 查询到的报告数据
+    const aiLoadingId = ref(null) // AI分析加载中
+    const aiAnalysisVisible = ref(false)
+    const aiAnalysis = ref(null)
+    const aiReportData = ref(null)
+
+    // AI分析用例结果
+    const aiAnalyze = async (row) => {
+      aiLoadingId.value = row.id
+      aiReportData.value = row
+      aiAnalysis.value = null
+      aiAnalysisVisible.value = true
+      try {
+        const res = await axios.post('/ai/analyze-result/' + row.id)
+        const data = res.data.data
+        aiAnalysis.value = typeof data === 'string' ? JSON.parse(data) : data
+      } catch (e) {
+        aiAnalysis.value = { verdict: 'error', analysis: '分析失败: ' + (e.response?.data?.msg || e.message), rootCause: '', suggestion: '' }
+      } finally {
+        aiLoadingId.value = null
+      }
+    }
+
+    const handleAiClose = () => {
+      aiAnalysis.value = null
+      aiReportData.value = null
+    }
+
+    const verdictTag = computed(() => {
+      const v = aiAnalysis.value?.verdict
+      if (v === 'passed') return 'success'
+      if (v === 'failed') return 'danger'
+      if (v === 'broken') return 'warning'
+      return 'info'
+    })
+
+    const verdictLabel = computed(() => {
+      const v = aiAnalysis.value?.verdict
+      if (v === 'passed') return '通过'
+      if (v === 'failed') return '失败'
+      if (v === 'broken') return '异常中断'
+      if (v === 'error') return '分析出错'
+      return '分析中'
+    })
+
+    const confidenceLabel = computed(() => {
+      const c = aiAnalysis.value?.confidence
+      if (c === 'high') return '高'
+      if (c === 'medium') return '中'
+      return '低'
+    })
+
+    const errorTypeTag = computed(() => {
+      const t = aiAnalysis.value?.errorType
+      if (t === 'http_error') return 'danger'
+      if (t === 'assert_error') return 'warning'
+      if (t === 'timeout') return 'info'
+      if (t === 'server_error') return 'danger'
+      return ''
+    })
+
+    const errorTypeLabel = computed(() => {
+      const t = aiAnalysis.value?.errorType
+      if (t === 'http_error') return 'HTTP 请求错误'
+      if (t === 'assert_error') return '断言验证失败'
+      if (t === 'timeout') return '请求超时'
+      if (t === 'server_error') return '服务端异常'
+      return t || '-'
+    })
+
+    const methodTag2 = (m) => {
+      const map = { GET: '', POST: 'success', PUT: 'warning', DELETE: 'danger', PATCH: 'info' }
+      return map[m] || ''
+    }
+    
+    
+
+
+
+    
     // 获取项目列表
     const fetchProjects = async () => {
       try {
@@ -755,7 +942,19 @@ export default {
         getAssertResultText,
         viewDetail,
         queryTestCases,
-        exportTestReport
+        exportTestReport,
+        aiAnalyze,
+        aiLoadingId,
+        aiAnalysisVisible,
+        aiAnalysis,
+        aiReportData,
+        verdictTag,
+        verdictLabel,
+        confidenceLabel,
+        errorTypeTag,
+        errorTypeLabel,
+        methodTag2,
+        handleAiClose
       }
   }
 }
@@ -791,8 +990,11 @@ export default {
 }
 
 .result-stats {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 /* 渐变色进度条样式 */
@@ -855,4 +1057,110 @@ pre {
   padding: 20px;
 }
 
+/* AI 分析结果样式 */
+.ai-analysis-container {
+  padding: 0 4px;
+}
+
+.ai-verdict-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.ai-verdict-tag {
+  font-size: 16px !important;
+  font-weight: 600;
+  padding: 8px 20px !important;
+}
+
+.ai-confidence {
+  font-size: 13px;
+  color: #909399;
+}
+
+.ai-confidence.confidence-high { color: #67c23a; }
+.ai-confidence.confidence-medium { color: #e6a23c; }
+.ai-confidence.confidence-low { color: #909399; }
+
+.ai-section {
+  background: #fafafa;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.ai-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.ai-card-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #606266;
+  white-space: pre-wrap;
+}
+
+.suggestion-text {
+  color: #e6a23c;
+  background: #fdf6ec;
+  padding: 10px 12px;
+  border-radius: 4px;
+}
+
+.raw-data-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.raw-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.raw-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.raw-label {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.raw-value {
+  font-size: 13px;
+  color: #303133;
+}
+
+.raw-pre {
+  background: #f5f7fa;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-height: 120px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-loading {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
+}
 </style>

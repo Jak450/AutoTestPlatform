@@ -8,14 +8,39 @@
 - **Backend Module**: `backed/AI_Study_Notes`
 - **Frontend Module**: `AutoTest_fronted`
 - **Started**: 2026-05-25T21:13:00+08:00
-- **Last Updated**: 2026-06-29T09:10:10+08:00
-- **Last Sync Scope**: AI-DLC documentation refreshed from current codebase
+- **Last Updated**: 2026-08-10T18:00:00+08:00
+- **Last Sync Scope**: Agent 模块全量开发 + 前端重设计 + 评测体系建立后的全面刷新
 
 ## Current Status
 
-- **Current Phase**: Maintenance / Reverse Engineering Refresh
-- **Current Stage**: Project Knowledge Sync
-- **Status**: complete; ready for next development task
+- **Current Phase**: Agent 模块开发完成 + 前端重设计完成 + 评测体系建立
+- **Current Stage**: 稳定可用；等待用户继续提需求/调整
+- **Status**: 开发主体完成，未推送提交 5 个，本地可运行
+
+## 2026-08-10 大版本更新（新窗口必读）
+
+本日基于 `docs/agent-design/` 五份设计文档完成了大量开发，涵盖：
+
+1. **Agent 模块（`backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/`）**
+   - P0：JWT 认证、多会话、SSE 流式对话、AgentLoop、工具系统、确认流程、前端登录 + Agent 页
+   - P1：文件上传解析、用例生成/校验/保存、模板、记忆、压缩、中间件、技能
+   - P2：工具/技能管理 API、审计、契约校验、部署文件
+   - A/B 修复轮：批量执行报告落库、附件清理、生产部署参数、流式重试/取消、大文档预算、
+     契约同步、自动压缩接线、记忆相关性检索 + 自动提炼、中间件补齐、技能 Redis 持久化、
+     SSE 事件 Redis 化、审计与 token 计量、管理端页面
+2. **用例草稿试跑**：`trial_run_cases`（真实执行草稿，支持随机抽样 + 多轮重跑 + flaky 标记）
+3. **Agent 评测脚手架**：`agent-eval/`（任务集 + 多轮 runner + report.md，当前基线 94%）
+4. **前端全站重设计（AutoTest·Blueprint 浅色蓝图）**：设计 Token、顶部导航、登录页、
+   Agent 三栏页、8 个数据页换肤、系统管理页（详见 `aidlc-docs/agent-module.md` 与
+   `docs/superpowers/specs/2026-08-10-frontend-redesign-design.md`）
+
+### 重要已知信息
+
+- 当前分支 `codex/agent`，**已 push 一次**（远端存在 `origin/codex/agent`），
+  本地另有 **5 个未推送提交**（`c60ea86`、`5d2e0f9`、`110a669`、`95a82e3`、`695b8e0`）
+- 本地开发环境：后端 8080（dev profile + `DEEPSEEK_API_KEY` 环境变量）、前端 5173、MySQL 3306、Redis 6379
+- 默认账号 `admin / 12345678`（启动时自动创建，可用 `ADMIN_INIT_PASSWORD` 覆盖）
+- Agent 模型层为自研 OpenAI 兼容客户端（支持 DeepSeek thinking 的 reasoning_content 回传）
 
 ## Stage Progress
 
@@ -189,8 +214,15 @@ There is no separate lint/typecheck script in `AutoTest_fronted/package.json`.
 
 ## Next Steps for New Session
 
-1. Read this file first for the current overview.
-2. Read `aidlc-docs/inception/reverse-engineering/architecture.md` and `api-documentation.md` for details.
-3. For AI changes, inspect `backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/aiservice/`.
-4. For UI/UX changes, inspect `AutoTest_fronted/src/views/AiRequirement.vue`, `BatchExecute.vue`, and `App.vue`.
-5. Preserve security conventions: never commit `.secrets.local`, `.env`, raw ARK keys, DB passwords, or local logs.
+1. 先读本文件，再读 `aidlc-docs/agent-module.md`（Agent 模块实现说明，含最新 A/B 修复、试跑、评测、前端重设计）。
+2. Agent 业务代码在 `backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/`；
+   旧 AI 模块（`aiservice/`）仍在，`AiRequirement.vue` 用的就是它（已切到 DeepSeek 配置）。
+3. 前端重设计：`AutoTest_fronted/src/styles/*`（Token/全局/Element 换肤）、
+   `components/layout/TopNav.vue`、`components/ui/*`、`components/agent/*`、`views/Agent.vue`。
+4. 评测：`node agent-eval/run-eval.mjs --rounds N`（前置：后端已启动且配置 DEEPSEEK_API_KEY）。
+5. 已知边界/待办（C 组准备项）：
+   - GitHub Actions Secrets 需补 `DEEPSEEK_API_KEY`、`JWT_SECRET`（≥32 字符）；`deploy.yml` 已接参数
+   - 生产库需执行 `backed/init.sql` 的 Agent 段（9 张 `agent_*` 表）
+   - 多实例部署：附件为本地磁盘，需对象存储/共享卷；SSE 事件已 Redis 化
+   - 模型在"生成→试跑"长流程上仍偶发不稳（多轮评测可量化），可继续调 prompt 或工具链
+6. 安全约定：不提交 `.secrets.local`、`.env`、真实密钥、本地日志；DEEPSEEK/JWT 密钥只走环境变量。

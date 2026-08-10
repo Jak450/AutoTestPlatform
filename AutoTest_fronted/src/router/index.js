@@ -2,17 +2,41 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
+    path: '/',
+    redirect: '/projects'
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
     meta: {
-      title: '登录',
-      public: true
+      title: '登录'
     }
   },
   {
-    path: '/',
-    redirect: '/projects'
+    path: '/agent',
+    name: 'Agent',
+    component: () => import('../views/Agent.vue'),
+    meta: {
+      title: 'AI Agent'
+    }
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('../views/Admin.vue'),
+    meta: {
+      title: '系统管理',
+      requiresAdmin: true
+    }
+  },
+  {
+    path: '/ai-requirement',
+    name: 'AiRequirement',
+    component: () => import('../views/AiRequirement.vue'),
+    meta: {
+      title: 'AI需求分析'
+    }
   },
   {
     path: '/projects',
@@ -77,14 +101,6 @@ const routes = [
     meta: {
       title: 'UI批量执行'
     }
-  },
-  {
-    path: '/agent',
-    name: 'Agent',
-    component: () => import('../views/AgentChat.vue'),
-    meta: {
-      title: 'AI Agent'
-    }
   }
 ]
 
@@ -97,22 +113,30 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 自动化测试平台` : '自动化测试平台'
-
-  // 登录守卫
+  // 登录守卫：未登录只能访问登录页
   const token = localStorage.getItem('token')
-  if (to.meta.public) {
-    if (token && to.path === '/login') {
-      next('/')
+  if (to.path !== '/login' && !token) {
+    next('/login')
+  } else if (to.path === '/login' && token) {
+    next('/')
+  } else {
+    // 管理员页面守卫
+    if (to.meta && to.meta.requiresAdmin) {
+      let user = null
+      try {
+        user = JSON.parse(localStorage.getItem('user') || 'null')
+      } catch (e) {
+        user = null
+      }
+      if (!user || user.role !== 'admin') {
+        next('/agent')
+      } else {
+        next()
+      }
     } else {
       next()
     }
-    return
   }
-  if (!token) {
-    next('/login')
-    return
-  }
-  next()
 })
 
 export default router

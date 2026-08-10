@@ -1,0 +1,26 @@
+:root {
+  --canvas: #F6F7F9;
+  --grid: rgba(36, 86, 230, 0.05);
+  --grid-size: 18px;
+  --panel: #FFFFFF;
+  --line: #DDE4F0;
+  --line-soft: #EDF1F8;
+  --primary: #2456E6;
+  --primary-hover: #1B45C4;
+  --primary-soft: #E8EEFA;
+  --ink-strong: #17233B;
+  --ink-body: #3D4A63;
+  --ink-muted: #7B879E;
+  --success: #1F9D55;
+  --danger: #DC2626;
+  --warning: #D97706;
+  --mono-ink: #1E293B;
+  --radius-card: 4px;
+  --radius-btn: 6px;
+  --radius-input: 6px;
+  --radius-bubble: 8px;
+  --shadow-panel: 0 1px 3px rgba(23, 35, 59, 0.06);
+  --font-display: 'Sora', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+}

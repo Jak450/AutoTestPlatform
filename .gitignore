@@ -12,3 +12,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# 本地运行 PID 文件
+*.pid
+
+# Agent 模块本地数据（附件、工具输出等）
+agent-data/
+
+# 视觉辅助/头脑风暴临时文件
+.superpowers/

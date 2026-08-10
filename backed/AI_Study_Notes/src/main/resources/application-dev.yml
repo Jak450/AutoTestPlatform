@@ -14,23 +14,15 @@ example.ai_study_notes:
     timeout: 3000
     ttl: 300
 
-agent:
-  auth:
-    jwt-secret: agent-test-platform-jwt-secret-2026-change-me
-    jwt-expire-seconds: 86400
-    allow-public-paths: /api/auth/login,/api/auth/logout
-  file:
-    base-dir: ./agent-data
-    max-size-mb: 10
-  llm:
-    base-url: https://api.deepseek.com
+ai:
+  ark:
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
     api-key: ${DEEPSEEK_API_KEY:}
-    model: deepseek-v4-flash
-    temperature: 0.3
-    timeout-seconds: 300
-  run:
-    max-rounds: 20
-    run-timeout-seconds: 300
+    doc-parser: deepseek-v4-flash
+    requirement-analysis: doubao-seed-2.0-pro
+    question-generation: deepseek-v4-flash
+    test-case-generation: doubao-seed-code
+    result-analysis: deepseek-v4-pro
 
 task:
   scheduler:
@@ -56,3 +48,20 @@ logging:
     root: INFO
     org.example.ai_study_notes: DEBUG
     org.example.ai_study_notes.mapper: DEBUG
+
+agent:
+  deepseek:
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+    temperature: 0.3
+    max-tokens: 4096
+    generation-max-tokens: 8192
+    timeout-seconds: 300
+  data-dir: ${AGENT_DATA_DIR:./agent-data}
+  jwt:
+    secret: ${JWT_SECRET:autotest-platform-dev-jwt-secret-please-override}
+    expire-minutes: 1440
+  loop:
+    max-turns: 20
+    timeout-seconds: 300
