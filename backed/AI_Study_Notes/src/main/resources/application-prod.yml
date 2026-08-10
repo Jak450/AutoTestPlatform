@@ -21,6 +21,24 @@ example:
     redis:
       ttl: 300
 
+agent:
+  auth:
+    jwt-secret: ${AGENT_JWT_SECRET:agent-test-platform-jwt-secret-2026-change-me}
+    jwt-expire-seconds: 86400
+    allow-public-paths: /api/auth/login,/api/auth/logout
+  file:
+    base-dir: /opt/autotest/agent-data
+    max-size-mb: 10
+  llm:
+    base-url: https://api.deepseek.com
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+    temperature: 0.3
+    timeout-seconds: 300
+  run:
+    max-rounds: 20
+    run-timeout-seconds: 300
+
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: example.ai_study_notes.Pojo.entity
@@ -30,16 +48,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-
-ai:
-  ark:
-    base-url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/coding/v3}
-    api-key: ${ARK_API_KEY:}
-    doc-parser: ${ARK_MODEL_DOC_PARSER:deepseek-v4-flash}
-    requirement-analysis: ${ARK_MODEL_REQUIREMENT_ANALYSIS:doubao-seed-2.0-pro}
-    question-generation: ${ARK_MODEL_QUESTION_GENERATION:deepseek-v4-flash}
-    test-case-generation: ${ARK_MODEL_TEST_CASE_GENERATION:doubao-seed-code}
-    result-analysis: ${ARK_MODEL_RESULT_ANALYSIS:deepseek-v4-pro}
 
 logging:
   file:

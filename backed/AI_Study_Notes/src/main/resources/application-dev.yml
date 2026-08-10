@@ -14,15 +14,23 @@ example.ai_study_notes:
     timeout: 3000
     ttl: 300
 
-ai:
-  ark:
-    base-url: https://ark.cn-beijing.volces.com/api/coding/v3
-    api-key: <your ARK_API_KEY>  # @secret ARK_API_KEY
-    doc-parser: deepseek-v4-flash
-    requirement-analysis: doubao-seed-2.0-pro
-    question-generation: deepseek-v4-flash
-    test-case-generation: doubao-seed-code
-    result-analysis: deepseek-v4-pro
+agent:
+  auth:
+    jwt-secret: agent-test-platform-jwt-secret-2026-change-me
+    jwt-expire-seconds: 86400
+    allow-public-paths: /api/auth/login,/api/auth/logout
+  file:
+    base-dir: ./agent-data
+    max-size-mb: 10
+  llm:
+    base-url: https://api.deepseek.com
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: deepseek-v4-flash
+    temperature: 0.3
+    timeout-seconds: 300
+  run:
+    max-rounds: 20
+    run-timeout-seconds: 300
 
 task:
   scheduler:

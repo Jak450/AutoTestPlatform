@@ -2,16 +2,17 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
-    path: '/',
-    redirect: '/projects'
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: {
+      title: '登录',
+      public: true
+    }
   },
   {
-    path: '/ai-requirement',
-    name: 'AiRequirement',
-    component: () => import('../views/AiRequirement.vue'),
-    meta: {
-      title: 'AI需求分析'
-    }
+    path: '/',
+    redirect: '/projects'
   },
   {
     path: '/projects',
@@ -76,6 +77,14 @@ const routes = [
     meta: {
       title: 'UI批量执行'
     }
+  },
+  {
+    path: '/agent',
+    name: 'Agent',
+    component: () => import('../views/AgentChat.vue'),
+    meta: {
+      title: 'AI Agent'
+    }
   }
 ]
 
@@ -88,6 +97,21 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 自动化测试平台` : '自动化测试平台'
+
+  // 登录守卫
+  const token = localStorage.getItem('token')
+  if (to.meta.public) {
+    if (token && to.path === '/login') {
+      next('/')
+    } else {
+      next()
+    }
+    return
+  }
+  if (!token) {
+    next('/login')
+    return
+  }
   next()
 })
 

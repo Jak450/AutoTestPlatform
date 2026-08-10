@@ -1,96 +1,8 @@
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
+-- AutoTestPlatform Agent 模块增量迁移脚本
+-- 幂等：使用 CREATE TABLE IF NOT EXISTS，不会破坏已有数据
+-- 适用数据库：app_test
 
--- 项目表
-DROP TABLE IF EXISTS `project`;
-CREATE TABLE `project` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- UI项目表
-DROP TABLE IF EXISTS `uiproject`;
-CREATE TABLE `uiproject` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(255) NOT NULL,
-  `description` TEXT NULL,
-  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- API测试用例表
-DROP TABLE IF EXISTS `use_case`;
-CREATE TABLE `use_case` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `pid` INT NOT NULL COMMENT '项目ID',
-  `name` VARCHAR(255) NOT NULL COMMENT '用例名称',
-  `url` VARCHAR(1024) NOT NULL COMMENT '接口地址',
-  `method` VARCHAR(16) NOT NULL COMMENT 'HTTP方法',
-  `header` TEXT NULL COMMENT '请求头JSON',
-  `param` TEXT NULL COMMENT '请求参数JSON',
-  `assert_str` TEXT NULL COMMENT '断言JSON',
-  `description` VARCHAR(512) NULL COMMENT '用例描述',
-  PRIMARY KEY (`id`),
-  KEY `idx_pid` (`pid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 测试执行报告表
-DROP TABLE IF EXISTS `test_case_report`;
-CREATE TABLE `test_case_report` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `case_id` INT NULL,
-  `case_name` VARCHAR(255) NULL,
-  `module_name` VARCHAR(255) NULL,
-  `description` VARCHAR(512) NULL,
-  `api_url` VARCHAR(1024) NULL,
-  `request_method` VARCHAR(16) NULL,
-  `request_headers` TEXT NULL,
-  `request_body` MEDIUMTEXT NULL,
-  `response_status` INT NULL,
-  `response_headers` MEDIUMTEXT NULL,
-  `response_body` MEDIUMTEXT NULL,
-  `duration` BIGINT NULL,
-  `assert_detail` MEDIUMTEXT NULL,
-  `status` VARCHAR(16) NULL,
-  `allure_result_json` MEDIUMTEXT NULL,
-  `start_time` DATETIME NULL,
-  `end_time` DATETIME NULL,
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_case_id` (`case_id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_start_time` (`start_time`),
-  KEY `idx_end_time` (`end_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- UI测试用例表
-DROP TABLE IF EXISTS `ui_use_cases`;
-CREATE TABLE `ui_use_cases` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `project_id` VARCHAR(36) NOT NULL,
-  `name` VARCHAR(100) NOT NULL,
-  `description` TEXT NULL,
-  `url` VARCHAR(255) NOT NULL,
-  `browser` VARCHAR(20) NOT NULL DEFAULT 'chrome',
-  `viewport` VARCHAR(20) NOT NULL DEFAULT '1920x1080',
-  `headless` BOOLEAN NOT NULL DEFAULT TRUE,
-  `timeout` INT NOT NULL DEFAULT 30,
-  `steps` JSON NOT NULL DEFAULT ('[]'),
-  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_project_id` (`project_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ============================================
--- Agent 模块（org.example.ai_study_notes.agent）
--- ============================================
-
--- 用户表
-DROP TABLE IF EXISTS `agent_user`;
-CREATE TABLE `agent_user` (
+CREATE TABLE IF NOT EXISTS `agent_user` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `username` VARCHAR(64) NOT NULL,
   `password_hash` VARCHAR(255) NOT NULL,
@@ -103,9 +15,7 @@ CREATE TABLE `agent_user` (
   UNIQUE KEY `uk_agent_user_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 会话表
-DROP TABLE IF EXISTS `agent_conversation`;
-CREATE TABLE `agent_conversation` (
+CREATE TABLE IF NOT EXISTS `agent_conversation` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `title` VARCHAR(128) NOT NULL DEFAULT '',
@@ -118,9 +28,7 @@ CREATE TABLE `agent_conversation` (
   KEY `idx_agent_conversation_user_updated` (`user_id`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 消息表
-DROP TABLE IF EXISTS `agent_message`;
-CREATE TABLE `agent_message` (
+CREATE TABLE IF NOT EXISTS `agent_message` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `conversation_id` BIGINT UNSIGNED NOT NULL,
   `role` VARCHAR(16) NOT NULL,
@@ -133,9 +41,7 @@ CREATE TABLE `agent_message` (
   KEY `idx_agent_message_conv_seq` (`conversation_id`, `seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 附件表
-DROP TABLE IF EXISTS `agent_attachment`;
-CREATE TABLE `agent_attachment` (
+CREATE TABLE IF NOT EXISTS `agent_attachment` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `conversation_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
@@ -150,9 +56,7 @@ CREATE TABLE `agent_attachment` (
   KEY `idx_agent_attachment_conv` (`conversation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 确认表
-DROP TABLE IF EXISTS `agent_confirmation`;
-CREATE TABLE `agent_confirmation` (
+CREATE TABLE IF NOT EXISTS `agent_confirmation` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `conversation_id` BIGINT UNSIGNED NOT NULL,
   `message_id` BIGINT UNSIGNED NULL,
@@ -167,9 +71,7 @@ CREATE TABLE `agent_confirmation` (
   KEY `idx_agent_confirmation_conv_status` (`conversation_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 用例模板表
-DROP TABLE IF EXISTS `agent_case_template`;
-CREATE TABLE `agent_case_template` (
+CREATE TABLE IF NOT EXISTS `agent_case_template` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `name` VARCHAR(128) NOT NULL,
@@ -184,9 +86,7 @@ CREATE TABLE `agent_case_template` (
   UNIQUE KEY `uk_agent_template_user_name` (`user_id`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 长期记忆表
-DROP TABLE IF EXISTS `agent_memory`;
-CREATE TABLE `agent_memory` (
+CREATE TABLE IF NOT EXISTS `agent_memory` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `scope` VARCHAR(16) NOT NULL DEFAULT 'user',
@@ -204,9 +104,7 @@ CREATE TABLE `agent_memory` (
   UNIQUE KEY `uk_agent_memory_user_key` (`user_id`, `scope`, `namespace`, `mem_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 工具注册表
-DROP TABLE IF EXISTS `agent_tool_registry`;
-CREATE TABLE `agent_tool_registry` (
+CREATE TABLE IF NOT EXISTS `agent_tool_registry` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `tool_name` VARCHAR(64) NOT NULL,
   `label` VARCHAR(64) NOT NULL DEFAULT '',
@@ -223,9 +121,7 @@ CREATE TABLE `agent_tool_registry` (
   UNIQUE KEY `uk_agent_tool_name` (`tool_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 审计日志表
-DROP TABLE IF EXISTS `agent_audit_log`;
-CREATE TABLE `agent_audit_log` (
+CREATE TABLE IF NOT EXISTS `agent_audit_log` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` BIGINT UNSIGNED NULL,
   `conversation_id` BIGINT UNSIGNED NULL,
@@ -236,7 +132,3 @@ CREATE TABLE `agent_audit_log` (
   PRIMARY KEY (`id`),
   KEY `idx_agent_audit_user_time` (`user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 默认管理员账号在应用启动时由 AdminUserSeeder 创建（BCrypt 密码 12345678）
-
-SET FOREIGN_KEY_CHECKS = 1;

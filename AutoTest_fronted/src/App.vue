@@ -14,16 +14,6 @@
           :collapse-transition="false"
           text-color="#ffffff"
         >
-          <el-sub-menu index="ai-test">
-            <template #title>
-              <el-icon><i-ep-cpu /></el-icon>
-              <span>AI 智能</span>
-            </template>
-            <el-menu-item index="/ai-requirement">
-              <el-icon><i-ep-document /></el-icon>
-              <span>AI需求分析</span>
-            </el-menu-item>
-          </el-sub-menu>
           <el-sub-menu index="interface-test">
             <template #title>
               <el-icon><i-ep-edit /></el-icon>
@@ -68,6 +58,10 @@
               <span>UI批量执行</span>
             </el-menu-item>
           </el-sub-menu>
+          <el-menu-item index="/agent">
+            <el-icon><i-ep-chat-dot-round /></el-icon>
+            <span>AI Agent</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -76,7 +70,17 @@
         <el-header height="60px" class="header">
           <div class="header-title">{{ pageTitle }}</div>
           <div class="header-actions">
-            <!-- 刷新按钮已删除 -->
+            <el-dropdown @command="handleCommand">
+              <span class="user-info">
+                {{ currentUser }}
+                <el-icon><i-ep-arrow-down /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </el-header>
         <el-main class="content">
@@ -93,14 +97,32 @@
 
 <script>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 export default {
   name: 'App',
   setup() {
     const route = useRoute()
+    const router = useRouter()
     const activeMenu = ref('/projects')
     const pageTitle = ref('项目管理')
+
+    const currentUser = computed(() => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        return user.displayName || user.username || ''
+      } catch (e) {
+        return ''
+      }
+    })
+
+    const handleCommand = (command) => {
+      if (command === 'logout') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        router.push('/login')
+      }
+    }
 
     // 监听路由变化
     watch(
@@ -116,7 +138,8 @@ export default {
           '/ui-test': 'UI测试工作台',
           '/ui-projects': 'UI项目管理',
           '/ui-use-cases': 'UI用例管理',
-          '/ui-batch-execute': 'UI批量执行'
+          '/ui-batch-execute': 'UI批量执行',
+          '/agent': 'AI Agent'
         }
         pageTitle.value = titleMap[newPath] || '自动化测试平台'
       },
@@ -125,7 +148,9 @@ export default {
 
     return {
       activeMenu,
-      pageTitle
+      pageTitle,
+      currentUser,
+      handleCommand
     }
   }
 }

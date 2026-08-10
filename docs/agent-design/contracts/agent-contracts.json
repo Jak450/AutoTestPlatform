@@ -1,0 +1,77 @@
+{
+  "contractVersion": "1.0.0",
+  "messageTypes": [
+    "text",
+    "tool_call",
+    "tool_result",
+    "file",
+    "confirmation",
+    "case_preview",
+    "system"
+  ],
+  "eventTypes": [
+    "agent_start",
+    "turn_start",
+    "message_start",
+    "message_update",
+    "message_end",
+    "tool_execution_start",
+    "tool_execution_update",
+    "tool_execution_end",
+    "turn_end",
+    "agent_end",
+    "heartbeat"
+  ],
+  "terminalEvents": ["agent_end"],
+  "toolResultMeta": {
+    "status": ["success", "error", "partial_success"],
+    "errorType": [
+      "auth",
+      "rate_limited",
+      "transient",
+      "config",
+      "permission",
+      "no_results",
+      "not_found",
+      "internal",
+      "test_failed",
+      "test_error",
+      "test_timeout",
+      "test_flaky",
+      "unknown"
+    ],
+    "recommendedNextAction": [
+      "continue",
+      "rewrite_query",
+      "try_alternative",
+      "summarize",
+      "stop"
+    ],
+    "source": ["exception", "tool_return", "content_analysis"]
+  },
+  "stopReasons": [
+    "stop",
+    "length",
+    "toolUse",
+    "error",
+    "aborted",
+    "token_capped",
+    "loop_capped",
+    "turn_capped"
+  ],
+  "permissions": [
+    "read",
+    "confirm_write",
+    "confirm_execute",
+    "deny"
+  ],
+  "roles": ["user", "admin"],
+  "session": {
+    "retentionDays": 7,
+    "branching": false
+  },
+  "files": {
+    "allowedExtensions": [".md", ".pdf", ".doc", ".docx", ".txt"],
+    "maxSizeBytes": 10485760
+  }
+}
