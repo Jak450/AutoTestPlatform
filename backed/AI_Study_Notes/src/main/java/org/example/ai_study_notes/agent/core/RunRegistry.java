@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.UUID;
 
 /**
  * 会话运行状态注册表：取消信号与运行标记。
@@ -18,6 +19,10 @@ public class RunRegistry {
         RunHandle handle = new RunHandle();
         runs.put(conversationId, handle);
         return handle;
+    }
+
+    public RunHandle get(Long conversationId) {
+        return runs.get(conversationId);
     }
 
     public void cancel(Long conversationId) {
@@ -42,6 +47,7 @@ public class RunRegistry {
 
     public static class RunHandle {
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
+        private final String traceId = UUID.randomUUID().toString();
 
         public void cancel() {
             cancelled.set(true);
@@ -49,6 +55,10 @@ public class RunRegistry {
 
         public boolean isCancelled() {
             return cancelled.get();
+        }
+
+        public String traceId() {
+            return traceId;
         }
     }
 }

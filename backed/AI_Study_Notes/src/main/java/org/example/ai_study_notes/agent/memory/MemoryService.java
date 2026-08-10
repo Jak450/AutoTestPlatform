@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 长期记忆服务：按用户隔离，同 key 覆盖升级版本。
@@ -82,18 +84,98 @@ public class MemoryService {
     }
 
     /**
+     * 保存未确认的自动提炼候选（confirmed=0，不参与注入）。
+     */
+    public MemoryEntry saveCandidate(Long userId, String key, String content) {
+        if (findByKey(userId, key) != null) {
+            return null;
+        }
+        MemoryEntry entry = MemoryEntry.builder()
+                .userId(userId)
+                .scope("user")
+                .namespace("candidate")
+                .memKey(key)
+                .contentMd(content)
+                .tags("auto")
+                .confidence("medium")
+                .confirmed(0)
+                .version(1)
+                .build();
+        memoryMapper.insert(entry);
+        return entry;
+    }
+
+    public void confirm(Long userId, Long memoryId) {
+        MemoryEntry entry = memoryMapper.selectById(memoryId);
+        if (entry == null || !entry.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("记忆不存在或无权访问");
+        }
+        MemoryEntry update = new MemoryEntry();
+        update.setId(entry.getId());
+        update.setConfirmed(1);
+        update.setNamespace("preference");
+        memoryMapper.updateById(update);
+    }
+
+    /**
      * 供上下文注入：返回最近确认的 Top-N 条记忆。
      */
     public List<String> injectable(Long userId) {
+        return injectable(userId, "");
+    }
+
+    /**
+     * 按查询相关性返回 Top-N 已确认记忆（简单词频打分），总预算 2KB。
+     */
+    public List<String> injectable(Long userId, String query) {
         List<MemoryEntry> entries = memoryMapper.selectList(new LambdaQueryWrapper<MemoryEntry>()
                 .eq(MemoryEntry::getUserId, userId)
                 .eq(MemoryEntry::getConfirmed, 1)
                 .orderByDesc(MemoryEntry::getUpdatedAt)
-                .last("limit " + MAX_INJECT));
-        List<String> result = new ArrayList<>();
+                .last("limit 100"));
+        Map<Long, Integer> scores = new LinkedHashMap<>();
+        List<String> terms = tokenize(query);
         for (MemoryEntry entry : entries) {
-            result.add(entry.getMemKey() + ": " + entry.getContentMd());
+            int score = 0;
+            String haystack = (entry.getMemKey() + " " + entry.getContentMd() + " " + entry.getTags()).toLowerCase();
+            for (String term : terms) {
+                if (haystack.contains(term)) {
+                    score++;
+                }
+            }
+            scores.put(entry.getId(), score);
+        }
+        entries.sort((a, b) -> {
+            int byScore = Integer.compare(scores.getOrDefault(b.getId(), 0), scores.getOrDefault(a.getId(), 0));
+            return byScore != 0 ? byScore : b.getUpdatedAt().compareTo(a.getUpdatedAt());
+        });
+        List<String> result = new ArrayList<>();
+        int budget = 2048;
+        for (MemoryEntry entry : entries) {
+            if (result.size() >= MAX_INJECT) {
+                break;
+            }
+            String line = entry.getMemKey() + ": " + entry.getContentMd();
+            budget -= line.length();
+            if (budget < 0 && !result.isEmpty()) {
+                break;
+            }
+            result.add(line);
         }
         return result;
+    }
+
+    private List<String> tokenize(String query) {
+        List<String> terms = new ArrayList<>();
+        if (query == null || query.isBlank()) {
+            return terms;
+        }
+        String[] parts = query.toLowerCase().split("[\\s,，。；;、:：]+");
+        for (String part : parts) {
+            if (part.length() >= 2) {
+                terms.add(part);
+            }
+        }
+        return terms;
     }
 }

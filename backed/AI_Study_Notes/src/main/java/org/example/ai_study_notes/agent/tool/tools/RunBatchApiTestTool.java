@@ -3,6 +3,7 @@ package org.example.ai_study_notes.agent.tool.tools;
 import org.example.ai_study_notes.Pojo.dto.BatchExecuteDTO;
 import org.example.ai_study_notes.Pojo.vo.BatchExecuteResultVO;
 import org.example.ai_study_notes.agent.contract.ToolPermission;
+import org.example.ai_study_notes.agent.report.AgentReportRecorder;
 import org.example.ai_study_notes.agent.tool.Args;
 import org.example.ai_study_notes.agent.tool.ToolContext;
 import org.example.ai_study_notes.agent.tool.ToolDefinition;
@@ -21,9 +22,11 @@ import java.util.Map;
 public class RunBatchApiTestTool implements ToolExecutor {
 
     private final ApiTestService apiTestService;
+    private final AgentReportRecorder reportRecorder;
 
-    public RunBatchApiTestTool(ApiTestService apiTestService) {
+    public RunBatchApiTestTool(ApiTestService apiTestService, AgentReportRecorder reportRecorder) {
         this.apiTestService = apiTestService;
+        this.reportRecorder = reportRecorder;
     }
 
     @Override
@@ -55,6 +58,7 @@ public class RunBatchApiTestTool implements ToolExecutor {
                 .maxConcurrency(Args.integer(args, "maxConcurrency", 5))
                 .build();
         BatchExecuteResultVO result = apiTestService.batchExecute(dto);
+        reportRecorder.recordBatch(dto, result);
         return ToolResult.success("run_batch_api_test", result,
                 "批量执行完成：成功 " + result.getSuccess() + "，失败 " + result.getFailed());
     }

@@ -7,6 +7,7 @@ import org.example.ai_study_notes.agent.memory.MemoryEntry;
 import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,6 +57,12 @@ public class MemoryController {
     @DeleteMapping
     public Result<Void> delete(@RequestParam("key") String key) {
         memoryService.delete(UserContext.userId(), key);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/confirm")
+    public Result<Void> confirm(@PathVariable("id") Long id) {
+        memoryService.confirm(UserContext.userId(), id);
         return Result.success();
     }
 

@@ -16,8 +16,8 @@ example.ai_study_notes:
 
 ai:
   ark:
-    base-url: https://ark.cn-beijing.volces.com/api/coding/v3
-    api-key: <your ARK_API_KEY>  # @secret ARK_API_KEY
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    api-key: ${DEEPSEEK_API_KEY:}
     doc-parser: deepseek-v4-flash
     requirement-analysis: doubao-seed-2.0-pro
     question-generation: deepseek-v4-flash

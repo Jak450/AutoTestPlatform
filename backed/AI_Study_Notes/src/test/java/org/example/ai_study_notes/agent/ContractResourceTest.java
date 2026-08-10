@@ -26,6 +26,9 @@ class ContractResourceTest {
         List<String> contractMessages = asStringList(root.get("messageTypes"));
         assertEquals(contractMessages, AgentContract.MESSAGE_TYPES);
 
+        List<String> contractEvents = asStringList(root.get("eventTypes"));
+        assertEquals(contractEvents, AgentContract.EVENT_TYPES);
+
         List<String> contractPermissions = asStringList(root.get("permissions"));
         assertEquals(contractPermissions, AgentContract.PERMISSIONS);
 
@@ -33,9 +36,7 @@ class ContractResourceTest {
         assertEquals(AgentContract.SESSION_RETENTION_DAYS, root.get("session").get("retentionDays").asInt());
 
         List<String> contractStopReasons = asStringList(root.get("stopReasons"));
-        for (String reason : contractStopReasons) {
-            assertTrue(AgentContract.STOP_REASONS.contains(reason), "代码缺少终止原因: " + reason);
-        }
+        assertEquals(contractStopReasons, AgentContract.STOP_REASONS);
     }
 
     private List<String> asStringList(JsonNode node) {

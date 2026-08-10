@@ -9,6 +9,8 @@ import org.example.ai_study_notes.agent.session.MessageService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 主动分层压缩：把窗口前的历史交给 LLM 生成结构化摘要，写入会话 context_summary。
@@ -21,6 +23,7 @@ public class ContextCompactor {
     private static final int KEEP_MESSAGES = 40;
     private static final int TRIGGER_MESSAGES = 80;
     private static final int TRIGGER_CHARS = 120_000;
+    private static final int GROW_BEFORE_RECOMPACT = 40;
 
     private static final String SUMMARIZE_PROMPT = """
             你是会话摘要器。请把对话历史压缩成结构化中文摘要，只输出以下小节：
@@ -31,6 +34,7 @@ public class ContextCompactor {
     private final ConversationService conversationService;
     private final MessageService messageService;
     private final AgentAiClient aiClient;
+    private final Map<Long, Integer> lastCompactedCount = new ConcurrentHashMap<>();
 
     public ContextCompactor(ConversationService conversationService,
                             MessageService messageService,
@@ -48,7 +52,17 @@ public class ContextCompactor {
                 chars += message.getContent().length();
             }
         }
-        return messages.size() > TRIGGER_MESSAGES || chars > TRIGGER_CHARS;
+        boolean overThreshold = messages.size() > TRIGGER_MESSAGES || chars > TRIGGER_CHARS;
+        if (!overThreshold) {
+            return false;
+        }
+        AgentConversation conversation = conversationService.get(conversationId);
+        boolean hasSummary = conversation != null
+                && conversation.getContextSummary() != null
+                && !conversation.getContextSummary().isBlank();
+        int lastCount = lastCompactedCount.getOrDefault(conversationId, 0);
+        // 已有摘要且增量不足时不再重复压缩
+        return !hasSummary || (messages.size() - lastCount) >= GROW_BEFORE_RECOMPACT;
     }
 
     /**
@@ -84,6 +98,7 @@ public class ContextCompactor {
         update.setId(conversationId);
         update.setContextSummary(summary);
         conversationService.update(update);
+        lastCompactedCount.put(conversationId, messages.size());
         log.info("会话 {} 压缩完成：摘要 {} 字符，保留 {} 条消息", conversationId, summary.length(), KEEP_MESSAGES);
         return summary;
     }

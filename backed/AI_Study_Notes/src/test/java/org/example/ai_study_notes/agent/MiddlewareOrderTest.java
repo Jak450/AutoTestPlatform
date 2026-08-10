@@ -7,6 +7,7 @@ import org.example.ai_study_notes.agent.middleware.Middleware;
 import org.example.ai_study_notes.agent.middleware.MiddlewareChain;
 import org.example.ai_study_notes.agent.middleware.ReadBeforeWriteMiddleware;
 import org.example.ai_study_notes.agent.middleware.ToolOutputBudgetMiddleware;
+import org.example.ai_study_notes.agent.middleware.ToolResultSanitizationMiddleware;
 import org.example.ai_study_notes.agent.tool.ToolRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,7 @@ class MiddlewareOrderTest {
                 new LoopDetectionMiddleware(),
                 new InputSanitizationMiddleware(),
                 new ReadBeforeWriteMiddleware(registry),
+                new ToolResultSanitizationMiddleware(),
                 new ToolOutputBudgetMiddleware());
         MiddlewareChain chain = new MiddlewareChain(shuffled);
         List<String> actual = chain.middlewares().stream()
@@ -35,6 +37,7 @@ class MiddlewareOrderTest {
         assertEquals(List.of(
                 InputSanitizationMiddleware.class.getSimpleName(),
                 ToolOutputBudgetMiddleware.class.getSimpleName(),
+                ToolResultSanitizationMiddleware.class.getSimpleName(),
                 ReadBeforeWriteMiddleware.class.getSimpleName(),
                 LoopDetectionMiddleware.class.getSimpleName(),
                 GuardrailMiddleware.class.getSimpleName()), actual);

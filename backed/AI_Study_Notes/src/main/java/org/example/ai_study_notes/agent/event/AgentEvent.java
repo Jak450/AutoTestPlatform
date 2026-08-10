@@ -1,8 +1,10 @@
 package org.example.ai_study_notes.agent.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Map;
 
@@ -11,6 +13,8 @@ import java.util.Map;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AgentEvent {
 
     private long id;

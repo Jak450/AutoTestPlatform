@@ -2,6 +2,7 @@ package org.example.ai_study_notes.agent.skill;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.agent.config.AgentProperties;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -21,9 +22,23 @@ import java.util.stream.Stream;
 @Component
 public class AgentSkillRegistry {
 
-    private final Map<String, AgentSkill> skills = new LinkedHashMap<>();
+    private static final String ENABLED_HASH = "agent:admin:skills";
 
-    public AgentSkillRegistry(AgentProperties properties) {
+    private final Map<String, AgentSkill> skills = new LinkedHashMap<>();
+    private final AgentProperties properties;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    public AgentSkillRegistry(AgentProperties properties, RedisTemplate<String, Object> redisTemplate) {
+        this.properties = properties;
+        this.redisTemplate = redisTemplate;
+        refresh();
+    }
+
+    /**
+     * 热重载：重新扫描 skills 目录（内容签名简化版：直接重扫）。
+     */
+    public synchronized void refresh() {
+        skills.clear();
         Path root = resolveSkillsRoot(properties.getSkillsDir());
         if (root == null) {
             log.warn("未找到 skills 目录，技能系统不可用");
@@ -49,6 +64,26 @@ public class AgentSkillRegistry {
 
     public AgentSkill get(String name) {
         return skills.get(name);
+    }
+
+    public boolean isEnabled(String name) {
+        try {
+            Object override = redisTemplate.opsForHash().get(ENABLED_HASH, name);
+            if (override != null) {
+                return Boolean.parseBoolean(String.valueOf(override));
+            }
+        } catch (Exception ignored) {
+            // ignore
+        }
+        AgentSkill skill = skills.get(name);
+        return skill == null || skill.isEnabled();
+    }
+
+    public void setEnabled(String name, boolean enabled) {
+        if (!skills.containsKey(name)) {
+            throw new IllegalArgumentException("技能不存在: " + name);
+        }
+        redisTemplate.opsForHash().put(ENABLED_HASH, name, String.valueOf(enabled));
     }
 
     public List<AgentSkill> list() {

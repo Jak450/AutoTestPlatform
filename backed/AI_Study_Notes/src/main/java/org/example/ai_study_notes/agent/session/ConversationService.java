@@ -1,6 +1,8 @@
 package org.example.ai_study_notes.agent.session;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.example.ai_study_notes.agent.file.AttachmentMapper;
+import org.example.ai_study_notes.agent.file.FileStorageService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -14,10 +16,17 @@ public class ConversationService {
 
     private final ConversationMapper conversationMapper;
     private final MessageService messageService;
+    private final AttachmentMapper attachmentMapper;
+    private final FileStorageService fileStorageService;
 
-    public ConversationService(ConversationMapper conversationMapper, MessageService messageService) {
+    public ConversationService(ConversationMapper conversationMapper,
+                               MessageService messageService,
+                               AttachmentMapper attachmentMapper,
+                               FileStorageService fileStorageService) {
         this.conversationMapper = conversationMapper;
         this.messageService = messageService;
+        this.attachmentMapper = attachmentMapper;
+        this.fileStorageService = fileStorageService;
     }
 
     public AgentConversation create(Long userId, String title) {
@@ -56,6 +65,7 @@ public class ConversationService {
             throw new IllegalArgumentException("会话不存在或无权访问");
         }
         messageService.deleteByConversation(conversationId);
+        deleteAttachments(conversationId);
         conversationMapper.deleteById(conversationId);
     }
 
@@ -75,7 +85,23 @@ public class ConversationService {
                 .lt(AgentConversation::getUpdatedAt, cutoff));
         for (AgentConversation conversation : expired) {
             messageService.deleteByConversation(conversation.getId());
+            deleteAttachments(conversation.getId());
             conversationMapper.deleteById(conversation.getId());
+        }
+    }
+
+    private void deleteAttachments(Long conversationId) {
+        try {
+            List<org.example.ai_study_notes.agent.file.AgentAttachment> attachments =
+                    attachmentMapper.selectList(new LambdaQueryWrapper<org.example.ai_study_notes.agent.file.AgentAttachment>()
+                            .eq(org.example.ai_study_notes.agent.file.AgentAttachment::getConversationId, conversationId));
+            for (org.example.ai_study_notes.agent.file.AgentAttachment attachment : attachments) {
+                fileStorageService.delete(attachment);
+            }
+            attachmentMapper.delete(new LambdaQueryWrapper<org.example.ai_study_notes.agent.file.AgentAttachment>()
+                    .eq(org.example.ai_study_notes.agent.file.AgentAttachment::getConversationId, conversationId));
+        } catch (Exception e) {
+            // 附件清理失败不影响会话删除
         }
     }
 }

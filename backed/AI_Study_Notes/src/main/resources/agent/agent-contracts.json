@@ -20,7 +20,8 @@
     "tool_execution_end",
     "turn_end",
     "agent_end",
-    "heartbeat"
+    "heartbeat",
+    "error"
   ],
   "terminalEvents": ["agent_end"],
   "toolResultMeta": {
@@ -57,7 +58,8 @@
     "aborted",
     "token_capped",
     "loop_capped",
-    "turn_capped"
+    "turn_capped",
+    "awaiting_confirmation"
   ],
   "permissions": [
     "read",

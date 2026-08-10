@@ -1,13 +1,12 @@
 package org.example.ai_study_notes.agent.skill;
 
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.RedisTemplate;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashSet;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 会话技能状态：加载/卸载，依赖工具激活。
@@ -16,40 +15,50 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SkillService {
 
     private final AgentSkillRegistry registry;
-    private final Map<Long, List<AgentSkill>> activeByConversation = new ConcurrentHashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    public SkillService(AgentSkillRegistry registry) {
+    public SkillService(AgentSkillRegistry registry, RedisTemplate<String, Object> redisTemplate) {
         this.registry = registry;
+        this.redisTemplate = redisTemplate;
     }
 
     public List<AgentSkill> listSkills() {
+        registry.refresh();
         return registry.list();
     }
 
     public AgentSkill load(Long conversationId, String name) {
+        registry.refresh();
         AgentSkill skill = registry.get(name);
         if (skill == null) {
             throw new IllegalArgumentException("技能不存在: " + name);
         }
-        if (!skill.isEnabled()) {
+        if (!registry.isEnabled(name)) {
             throw new IllegalArgumentException("技能已禁用: " + name);
         }
-        List<AgentSkill> active = activeByConversation.computeIfAbsent(conversationId, k -> new ArrayList<>());
-        if (active.stream().noneMatch(s -> s.getName().equals(name))) {
-            active.add(skill);
+        String key = skillsKey(conversationId);
+        List<Object> active = redisTemplate.opsForList().range(key, 0, -1);
+        if (active == null || active.stream().noneMatch(v -> String.valueOf(v).equals(name))) {
+            redisTemplate.opsForList().rightPush(key, name);
         }
+        redisTemplate.expire(key, 7, TimeUnit.DAYS);
         return skill;
     }
 
     public void unload(Long conversationId, String name) {
-        List<AgentSkill> active = activeByConversation.get(conversationId);
-        if (active != null) {
-            active.removeIf(s -> s.getName().equals(name));
-        }
+        redisTemplate.opsForList().remove(skillsKey(conversationId), 0, name);
     }
 
     public List<AgentSkill> activeSkills(Long conversationId) {
-        return activeByConversation.getOrDefault(conversationId, List.of());
+        registry.refresh();
+        List<Object> names = redisTemplate.opsForList().range(skillsKey(conversationId), 0, -1);
+        if (names == null) {
+            return List.of();
+        }
+        return names.stream()
+                .map(n -> registry.get(String.valueOf(n)))
+                .filter(s -> s != null && registry.isEnabled(s.getName()))
+                .toList();
     }
 
     public Set<String> activatedTools(Long conversationId) {
@@ -58,5 +67,9 @@ public class SkillService {
             tools.addAll(skill.getTools());
         }
         return tools;
+    }
+
+    private String skillsKey(Long conversationId) {
+        return "agent:conv:" + conversationId + ":skills";
     }
 }

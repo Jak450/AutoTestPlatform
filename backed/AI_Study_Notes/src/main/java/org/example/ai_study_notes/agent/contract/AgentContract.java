@@ -16,7 +16,7 @@ public final class AgentContract {
     public static final List<String> EVENT_TYPES = List.of(
             "agent_start", "turn_start", "message_start", "message_update", "message_end",
             "tool_execution_start", "tool_execution_update", "tool_execution_end",
-            "turn_end", "agent_end", "heartbeat");
+            "turn_end", "agent_end", "heartbeat", "error");
 
     public static final List<String> TERMINAL_EVENTS = List.of("agent_end");
 

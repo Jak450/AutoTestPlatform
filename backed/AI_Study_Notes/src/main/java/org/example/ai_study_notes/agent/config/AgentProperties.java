@@ -37,6 +37,7 @@ public class AgentProperties {
     public static class Loop {
         private int maxTurns = 20;
         private long timeoutSeconds = 300;
+        private int maxContextTokens = 0;
     }
 
     @Data

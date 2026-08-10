@@ -86,14 +86,17 @@ public class AgentLlmClient {
      * 同时累积 content/reasoning_content/tool_calls，结束时返回完整响应。
      */
     public LlmResponse chatStream(List<LlmMessage> messages, List<ToolDefinition> tools,
-                                  Consumer<String> onTextDelta) {
+                                  Consumer<String> onTextDelta,
+                                  Runnable onThinkingStart,
+                                  java.util.function.BooleanSupplier cancelled) {
         Map<String, Object> body = buildRequestBody(messages, tools);
         body.put("stream", true);
         String endpoint = properties.getDeepseek().getBaseUrl()
                 + (properties.getDeepseek().getBaseUrl().endsWith("/") ? "" : "/")
                 + "chat/completions";
         Exception lastError = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
+        HttpResponse<InputStream> response = null;
+        for (int attempt = 0; attempt < 2 && response == null; attempt++) {
             try {
                 String json = objectMapper.writeValueAsString(body);
                 HttpRequest request = HttpRequest.newBuilder()
@@ -103,28 +106,57 @@ public class AgentLlmClient {
                         .header("Authorization", "Bearer " + properties.getDeepseek().getApiKey())
                         .POST(HttpRequest.BodyPublishers.ofString(json))
                         .build();
-                HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                java.util.concurrent.CompletableFuture<HttpResponse<InputStream>> future =
+                        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
+                while (!future.isDone()) {
+                    if (cancelled != null && cancelled.getAsBoolean()) {
+                        future.cancel(true);
+                        throw new IllegalStateException("请求已被用户取消");
+                    }
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        future.cancel(true);
+                        throw new IllegalStateException("请求已中断", ie);
+                    }
+                }
+                response = future.get();
                 if (response.statusCode() / 100 != 2) {
                     String errBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
                     throw new IllegalStateException("HTTP " + response.statusCode() + ": " + errBody);
                 }
-                return parseStream(response.body(), onTextDelta);
             } catch (Exception e) {
                 lastError = e;
-                if (attempt == 0) {
+                boolean cancelledByUser = e instanceof IllegalStateException ise
+                        && "请求已被用户取消".equals(ise.getMessage());
+                if (attempt == 0 && !cancelledByUser) {
                     log.warn("LLM 流式调用失败，重试一次: {}", e.getMessage());
+                }
+                if (cancelledByUser) {
+                    break;
                 }
             }
         }
-        throw new IllegalStateException("模型调用失败: " + lastError.getMessage(), lastError);
+        if (response == null) {
+            throw new IllegalStateException("模型调用失败: " + (lastError == null ? "未知错误" : lastError.getMessage()), lastError);
+        }
+        // 流中途失败不重试（避免重复推送已发出的增量），由上层转 error 事件
+        try {
+            return parseStream(response.body(), onTextDelta, onThinkingStart);
+        } catch (Exception e) {
+            throw new IllegalStateException("模型流式响应解析失败: " + e.getMessage(), e);
+        }
     }
 
-    private LlmResponse parseStream(InputStream in, Consumer<String> onTextDelta) throws Exception {
+    private LlmResponse parseStream(InputStream in, Consumer<String> onTextDelta, Runnable onThinkingStart) throws Exception {
         StringBuilder content = new StringBuilder();
         StringBuilder reasoning = new StringBuilder();
         TreeMap<Integer, Map<String, String>> toolFragments = new TreeMap<>();
         boolean toolCallSeen = false;
         String finishReason = null;
+        int usage = -1;
+        boolean thinkingNotified = false;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -139,6 +171,9 @@ public class AgentLlmClient {
                     break;
                 }
                 JsonNode root = objectMapper.readTree(payload);
+                if (!root.path("usage").isNull()) {
+                    usage = root.path("usage").path("total_tokens").asInt(-1);
+                }
                 JsonNode choice = root.path("choices").path(0);
                 if (!choice.path("finish_reason").isNull()) {
                     finishReason = choice.path("finish_reason").asText();
@@ -146,6 +181,10 @@ public class AgentLlmClient {
                 JsonNode delta = choice.path("delta");
                 if (!delta.path("reasoning_content").isNull()) {
                     reasoning.append(delta.path("reasoning_content").asText());
+                    if (!thinkingNotified && content.length() == 0 && onThinkingStart != null) {
+                        onThinkingStart.run();
+                        thinkingNotified = true;
+                    }
                 }
                 JsonNode calls = delta.path("tool_calls");
                 if (calls.isArray()) {
@@ -192,7 +231,8 @@ public class AgentLlmClient {
                 content.length() == 0 ? null : content.toString(),
                 reasoning.length() == 0 ? null : reasoning.toString(),
                 toolCalls,
-                finishReason);
+                finishReason,
+                usage < 0 ? null : usage);
     }
 
     private Map<String, Object> buildRequestBody(List<LlmMessage> messages, List<ToolDefinition> tools) {
@@ -267,10 +307,11 @@ public class AgentLlmClient {
             }
         }
         String finishReason = root.path("choices").path(0).path("finish_reason").asText(null);
-        return new LlmResponse(content, reasoning, toolCalls, finishReason);
+        int usage = root.path("usage").path("total_tokens").asInt(-1);
+        return new LlmResponse(content, reasoning, toolCalls, finishReason, usage < 0 ? null : usage);
     }
 
     public record LlmResponse(String content, String reasoningContent,
-                              List<LlmMessage.ToolCall> toolCalls, String finishReason) {
+                              List<LlmMessage.ToolCall> toolCalls, String finishReason, Integer tokenUsage) {
     }
 }

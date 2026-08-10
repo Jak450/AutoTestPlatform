@@ -9,9 +9,11 @@ import org.example.ai_study_notes.agent.config.AgentProperties;
 import org.example.ai_study_notes.agent.contract.EventType;
 import org.example.ai_study_notes.agent.contract.StopReason;
 import org.example.ai_study_notes.agent.context.ContextAssembler;
+import org.example.ai_study_notes.agent.context.ContextCompactor;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
 import org.example.ai_study_notes.agent.memory.MemoryService;
+import org.example.ai_study_notes.agent.memory.MemoryExtractor;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
 import org.example.ai_study_notes.agent.session.MessageService;
@@ -48,6 +50,8 @@ public class AgentLoop {
     private final ContextAssembler contextAssembler;
     private final SystemPromptBuilder systemPromptBuilder;
     private final MemoryService memoryService;
+    private final ContextCompactor contextCompactor;
+    private final MemoryExtractor memoryExtractor;
     private final SkillService skillService;
     private final AuditService auditService;
     private final RunRegistry runRegistry;
@@ -64,6 +68,8 @@ public class AgentLoop {
                      ContextAssembler contextAssembler,
                      SystemPromptBuilder systemPromptBuilder,
                      MemoryService memoryService,
+                     ContextCompactor contextCompactor,
+                     MemoryExtractor memoryExtractor,
                      SkillService skillService,
                      AuditService auditService,
                      RunRegistry runRegistry,
@@ -79,6 +85,8 @@ public class AgentLoop {
         this.contextAssembler = contextAssembler;
         this.systemPromptBuilder = systemPromptBuilder;
         this.memoryService = memoryService;
+        this.contextCompactor = contextCompactor;
+        this.memoryExtractor = memoryExtractor;
         this.skillService = skillService;
         this.auditService = auditService;
         this.runRegistry = runRegistry;
@@ -104,11 +112,15 @@ public class AgentLoop {
                         "messageId", userMessage.getId(), "delta", userText, "role", "user", "type", "text"));
                 stream.emit(EventType.MESSAGE_END.value(), Map.of("messageId", userMessage.getId()));
             }
-            StopReason stopReason = loop(conversationId, userId, stream, runId);
+            int[] tokenAcc = {0};
+            StopReason stopReason = loop(conversationId, userId, stream, runId, tokenAcc);
             stream.emit(EventType.AGENT_END.value(), Map.of(
                     "runId", runId, "conversationId", conversationId, "stopReason", stopReason.value()));
             auditService.log(userId, conversationId, runId, "agent_run_end",
-                    Map.of("stopReason", stopReason.value()));
+                    Map.of("stopReason", stopReason.value(), "tokens", tokenAcc[0]));
+            if (stopReason == StopReason.STOP) {
+                memoryExtractor.extractIfNeeded(conversationId, userId, historyTail(conversationId));
+            }
         } catch (Exception e) {
             log.error("Agent run 失败 conversationId={}", conversationId, e);
             stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", e.getMessage()));
@@ -121,9 +133,15 @@ public class AgentLoop {
         }
     }
 
-    private StopReason loop(Long conversationId, Long userId, ConversationEventStream stream, String runId) {
+    private StopReason loop(Long conversationId, Long userId, ConversationEventStream stream,
+                            String runId, int[] tokenAcc) {
+        if (contextCompactor.needsCompaction(conversationId)) {
+            log.info("会话 {} 触发自动压缩", conversationId);
+            contextCompactor.compact(conversationId);
+        }
         List<LlmMessage> messages = new ArrayList<>();
-        List<String> memories = userId == null ? java.util.List.of() : memoryService.injectable(userId);
+        List<String> memories = userId == null ? java.util.List.of()
+                : memoryService.injectable(userId, memoryQuery(conversationId));
         List<String> skillBodies = skillService.activeSkills(conversationId).stream()
                 .map(AgentSkill::getBody).toList();
         messages.add(LlmMessage.builder()
@@ -138,32 +156,64 @@ public class AgentLoop {
                 return StopReason.ABORTED;
             }
             stream.emit(EventType.TURN_START.value(), Map.of("runId", runId, "turn", turn));
+            int maxContextTokens = properties.getLoop().getMaxContextTokens();
+            if (maxContextTokens > 0) {
+                int estimate = messages.stream()
+                        .mapToInt(m -> m.getContent() == null ? 0 : m.getContent().length() / 4)
+                        .sum();
+                if (estimate > maxContextTokens) {
+                    stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", "上下文超过 token 预算"));
+                    return StopReason.TOKEN_CAPPED;
+                }
+            }
 
             // 流式输出：收到 token 即推 message_start/message_update，结束后统一持久化
             final String[] streamingMessageId = {null};
+            final boolean[] thinking = {false};
             final int currentTurn = turn;
+            java.util.function.Consumer<String> onDelta = delta -> {
+                if (delta == null || delta.isEmpty()) {
+                    return;
+                }
+                if (streamingMessageId[0] == null) {
+                    streamingMessageId[0] = "s-" + runId + "-" + currentTurn;
+                    stream.emit(EventType.MESSAGE_START.value(), Map.of(
+                            "messageId", streamingMessageId[0], "role", "assistant", "type", "text"));
+                }
+                if (thinking[0]) {
+                    stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
+                            "messageId", streamingMessageId[0], "delta", "", "thinking", false));
+                    thinking[0] = false;
+                }
+                stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
+                        "messageId", streamingMessageId[0], "delta", delta));
+            };
+            Runnable onThinkingStart = () -> {
+                if (streamingMessageId[0] == null) {
+                    streamingMessageId[0] = "s-" + runId + "-" + currentTurn;
+                    stream.emit(EventType.MESSAGE_START.value(), Map.of(
+                            "messageId", streamingMessageId[0], "role", "assistant", "type", "text"));
+                }
+                thinking[0] = true;
+                stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
+                        "messageId", streamingMessageId[0], "delta", "", "thinking", true));
+            };
             AgentLlmClient.LlmResponse response;
             try {
                 response = llmClient.chatStream(
                         messages,
                         toolRegistry.activeDefinitions(conversationId, skillService.activatedTools(conversationId)),
-                        delta -> {
-                            if (delta == null || delta.isEmpty()) {
-                                return;
-                            }
-                            if (streamingMessageId[0] == null) {
-                                streamingMessageId[0] = "s-" + runId + "-" + currentTurn;
-                                stream.emit(EventType.MESSAGE_START.value(), Map.of(
-                                        "messageId", streamingMessageId[0], "role", "assistant", "type", "text"));
-                            }
-                            stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
-                                    "messageId", streamingMessageId[0], "delta", delta));
-                        });
+                        onDelta,
+                        onThinkingStart,
+                        () -> runRegistry.isCancelled(conversationId));
             } catch (Exception e) {
                 log.error("LLM 调用失败 conversationId={}", conversationId, e);
                 stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", e.getMessage()));
                 stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
                 return StopReason.ERROR;
+            }
+            if (response.tokenUsage() != null) {
+                tokenAcc[0] += response.tokenUsage();
             }
 
             List<LlmMessage.ToolCall> toolCalls = response.toolCalls();
@@ -238,6 +288,31 @@ public class AgentLoop {
             }
 
             String text = response.content() == null ? "" : response.content();
+            if (text.isBlank()) {
+                // 空终态回复重试一次（TerminalResponse）
+                try {
+                    AgentLlmClient.LlmResponse retry = llmClient.chatStream(
+                            messages,
+                            toolRegistry.activeDefinitions(conversationId, skillService.activatedTools(conversationId)),
+                            onDelta,
+                            onThinkingStart,
+                            () -> runRegistry.isCancelled(conversationId));
+                    if (retry.toolCalls() != null && !retry.toolCalls().isEmpty()) {
+                        stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", "模型空回复重试后转为工具调用，已停止"));
+                        stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
+                        return StopReason.ERROR;
+                    }
+                    text = retry.content() == null ? "" : retry.content();
+                    if (retry.tokenUsage() != null) {
+                        tokenAcc[0] += retry.tokenUsage();
+                    }
+                } catch (Exception e) {
+                    log.error("空回复重试失败 conversationId={}", conversationId, e);
+                    stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", "模型空回复: " + e.getMessage()));
+                    stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
+                    return StopReason.ERROR;
+                }
+            }
             Map<String, Object> meta = new LinkedHashMap<>();
             if (response.reasoningContent() != null) {
                 meta.put("reasoningContent", response.reasoningContent());
@@ -270,6 +345,37 @@ public class AgentLoop {
             log.warn("工具参数解析失败: {}", arguments);
             return new LinkedHashMap<>();
         }
+    }
+
+    private String memoryQuery(Long conversationId) {
+        List<AgentMessage> all = messageService.list(conversationId);
+        StringBuilder query = new StringBuilder();
+        int added = 0;
+        for (int i = all.size() - 1; i >= 0 && added < 2; i--) {
+            AgentMessage message = all.get(i);
+            if ("user".equals(message.getRole()) && "text".equals(message.getType())) {
+                if (message.getContent() != null) {
+                    query.append(message.getContent()).append(' ');
+                }
+                added++;
+            }
+        }
+        return query.toString();
+    }
+
+    private String historyTail(Long conversationId) {
+        List<AgentMessage> all = messageService.list(conversationId);
+        StringBuilder tail = new StringBuilder();
+        int added = 0;
+        for (int i = all.size() - 1; i >= 0 && added < 6; i--) {
+            AgentMessage message = all.get(i);
+            if (message.getContent() == null || message.getContent().isBlank()) {
+                continue;
+            }
+            tail.insert(0, "[" + message.getRole() + "] " + message.getContent() + "\n");
+            added++;
+        }
+        return tail.toString();
     }
 
     private Map<String, Object> toolMeta(String toolCallId, String toolName, Map<String, Object> args,

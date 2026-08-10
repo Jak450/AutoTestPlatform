@@ -3,6 +3,10 @@ package org.example.ai_study_notes.agent.api;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.ai_study_notes.Pojo.Result;
 import org.example.ai_study_notes.agent.auth.AgentUserService;
+import org.example.ai_study_notes.agent.skill.AgentSkill;
+import org.example.ai_study_notes.agent.skill.AgentSkillRegistry;
+import org.example.ai_study_notes.agent.template.CaseTemplate;
+import org.example.ai_study_notes.agent.template.CaseTemplateMapper;
 import org.example.ai_study_notes.agent.tool.ToolDefinition;
 import org.example.ai_study_notes.agent.tool.ToolRegistry;
 import org.example.ai_study_notes.agent.tool.ToolRegistryEntry;
@@ -28,13 +32,19 @@ public class AdminController {
     private final AgentUserService userService;
     private final ToolRegistry toolRegistry;
     private final ToolRegistryEntryMapper entryMapper;
+    private final AgentSkillRegistry skillRegistry;
+    private final CaseTemplateMapper caseTemplateMapper;
 
     public AdminController(AgentUserService userService,
                            ToolRegistry toolRegistry,
-                           ToolRegistryEntryMapper entryMapper) {
+                           ToolRegistryEntryMapper entryMapper,
+                           AgentSkillRegistry skillRegistry,
+                           CaseTemplateMapper caseTemplateMapper) {
         this.userService = userService;
         this.toolRegistry = toolRegistry;
         this.entryMapper = entryMapper;
+        this.skillRegistry = skillRegistry;
+        this.caseTemplateMapper = caseTemplateMapper;
     }
 
     @GetMapping("/tools")
@@ -92,5 +102,70 @@ public class AdminController {
             update.setEnabled(enabled ? 1 : 0);
             entryMapper.updateById(update);
         }
+    }
+
+    @GetMapping("/skills")
+    public Result<List<Map<String, Object>>> listSkills() {
+        if (!userService.isAdmin()) {
+            return Result.error("无权限，仅管理员可访问");
+        }
+        skillRegistry.refresh();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (AgentSkill skill : skillRegistry.list()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("name", skill.getName());
+            map.put("description", skill.getDescription());
+            map.put("version", skill.getVersion());
+            map.put("enabled", skillRegistry.isEnabled(skill.getName()));
+            map.put("tools", skill.getTools());
+            result.add(map);
+        }
+        return Result.success(result);
+    }
+
+    @PostMapping("/skills/{name}/{action}")
+    public Result<Map<String, Object>> toggleSkill(@PathVariable("name") String name,
+                                                   @PathVariable("action") String action) {
+        if (!userService.isAdmin()) {
+            return Result.error("无权限，仅管理员可访问");
+        }
+        boolean enabled = "enable".equalsIgnoreCase(action);
+        if (!"enable".equalsIgnoreCase(action) && !"disable".equalsIgnoreCase(action)) {
+            return Result.error("action 必须是 enable 或 disable");
+        }
+        try {
+            skillRegistry.setEnabled(name, enabled);
+            return Result.success(Map.of("name", name, "enabled", enabled));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/templates")
+    public Result<List<Map<String, Object>>> listAllTemplates() {
+        if (!userService.isAdmin()) {
+            return Result.error("无权限，仅管理员可访问");
+        }
+        List<CaseTemplate> templates = caseTemplateMapper.selectList(null);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (CaseTemplate template : templates) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", template.getId());
+            map.put("userId", template.getUserId());
+            map.put("name", template.getName());
+            map.put("description", template.getDescription());
+            map.put("updatedAt", template.getUpdatedAt());
+            result.add(map);
+        }
+        return Result.success(result);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/templates/{id}")
+    public Result<Void> deleteTemplate(@PathVariable("id") Long id) {
+        if (!userService.isAdmin()) {
+            return Result.error("无权限，仅管理员可访问");
+        }
+        caseTemplateMapper.deleteById(id);
+        return Result.success();
     }
 }

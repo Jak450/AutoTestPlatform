@@ -60,7 +60,7 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
             # 同步部署文件
-            mkdir -p /opt/autotest /opt/filebeat
+            mkdir -p /opt/autotest /opt/autotest/agent-data /opt/filebeat
             cp /tmp/deploy-package/app.jar /opt/autotest/
             rm -rf /opt/autotest/dist
             cp -r /tmp/deploy-package/dist /opt/autotest/
@@ -84,6 +84,9 @@ jobs:
               --REDIS_HOST=localhost \
               --REDIS_PORT=6379 \
               --ARK_API_KEY=${{ secrets.ARK_API_KEY }} \
+              --DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }} \
+              --JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              --ADMIN_INIT_PASSWORD=${{ secrets.ADMIN_INIT_PASSWORD }} \
               > app.log 2>&1 &
             echo $! > app.pid
 

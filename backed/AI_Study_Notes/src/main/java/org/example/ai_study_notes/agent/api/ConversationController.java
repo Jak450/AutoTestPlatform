@@ -191,7 +191,8 @@ public class ConversationController {
     @GetMapping(value = "/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable("id") Long id,
                              @RequestParam(name = "lastEventId", defaultValue = "0") long lastEventId,
-                             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventIdHeader) {
+                             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventIdHeader,
+                             jakarta.servlet.http.HttpServletResponse response) {
         if (lastEventId <= 0 && lastEventIdHeader != null) {
             try {
                 lastEventId = Long.parseLong(lastEventIdHeader.trim());
@@ -200,6 +201,8 @@ public class ConversationController {
             }
         }
         requireOwned(id);
+        RunRegistry.RunHandle handle = runRegistry.get(id);
+        response.setHeader("X-Trace-Id", handle == null ? "conv-" + id : handle.traceId());
         ConversationEventStream stream = eventStreamService.getOrCreate(id);
         SseEmitter emitter = new SseEmitter(0L);
         stream.replay(emitter, lastEventId);
@@ -231,7 +234,7 @@ public class ConversationController {
                     emitter.complete();
                     heartbeat.shutdown();
                 } else {
-                    stream.emit(EventType.HEARTBEAT.value(), Map.of("ts", System.currentTimeMillis()));
+                    stream.emitLive(EventType.HEARTBEAT.value(), Map.of("ts", System.currentTimeMillis()));
                 }
             } catch (Exception e) {
                 heartbeat.shutdown();

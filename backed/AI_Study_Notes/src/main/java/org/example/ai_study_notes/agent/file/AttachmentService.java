@@ -79,6 +79,19 @@ public class AttachmentService {
         attachmentMapper.deleteById(attachmentId);
     }
 
+    /**
+     * 删除会话下全部附件（记录 + 磁盘文件），供会话删除/过期清理调用。
+     */
+    public void deleteByConversation(Long conversationId) {
+        List<AgentAttachment> attachments = attachmentMapper.selectList(new LambdaQueryWrapper<AgentAttachment>()
+                .eq(AgentAttachment::getConversationId, conversationId));
+        for (AgentAttachment attachment : attachments) {
+            fileStorageService.delete(attachment);
+        }
+        attachmentMapper.delete(new LambdaQueryWrapper<AgentAttachment>()
+                .eq(AgentAttachment::getConversationId, conversationId));
+    }
+
     public String parse(Long userId, Long attachmentId) {
         AgentAttachment attachment = getOwned(userId, attachmentId);
         if (attachment == null) {

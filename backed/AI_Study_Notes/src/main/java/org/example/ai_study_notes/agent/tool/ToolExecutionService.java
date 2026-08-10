@@ -1,6 +1,7 @@
 package org.example.ai_study_notes.agent.tool;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.ai_study_notes.agent.audit.AuditService;
 import org.example.ai_study_notes.agent.contract.ToolResultMeta;
 import org.example.ai_study_notes.agent.middleware.MiddlewareChain;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class ToolExecutionService {
     private final ToolRegistry registry;
     private final SchemaValidator schemaValidator;
     private final MiddlewareChain middlewareChain;
+    private final AuditService auditService;
 
-    public ToolExecutionService(ToolRegistry registry, SchemaValidator schemaValidator, MiddlewareChain middlewareChain) {
+    public ToolExecutionService(ToolRegistry registry, SchemaValidator schemaValidator,
+                                MiddlewareChain middlewareChain, AuditService auditService) {
         this.registry = registry;
         this.schemaValidator = schemaValidator;
         this.middlewareChain = middlewareChain;
+        this.auditService = auditService;
     }
 
     /**
@@ -52,21 +56,42 @@ public class ToolExecutionService {
         }
         java.util.Optional<ToolResult> intercepted = middlewareChain.before(toolName, args, context);
         if (intercepted.isPresent()) {
-            return intercepted.get().withDuration(start);
+            ToolResult result = intercepted.get().withDuration(start);
+            audit(context, toolName, result);
+            return result;
         }
         try {
             ToolResult result = definition.getExecutor().execute(args, context);
             result.setToolName(toolName);
             result.withDuration(start);
             middlewareChain.after(toolName, args, result, context);
+            audit(context, toolName, result);
             return result;
         } catch (Exception e) {
             log.error("工具执行失败 tool={} args={}", toolName, args, e);
-            return ToolResult.error(toolName,
+            ToolResult result = ToolResult.error(toolName,
                     "工具执行失败: " + e.getMessage(),
                     ToolResultMeta.ErrorType.INTERNAL,
                     ToolResultMeta.RecommendedNextAction.TRY_ALTERNATIVE,
                     start);
+            audit(context, toolName, result);
+            return result;
+        }
+    }
+
+    private void audit(ToolContext context, String toolName, ToolResult result) {
+        if (context == null) {
+            return;
+        }
+        try {
+            auditService.log(context.getUserId(), context.getConversationId(), null, "tool_executed",
+                    java.util.Map.of(
+                            "toolName", toolName,
+                            "status", result.getStatus() == null ? null : result.getStatus().value(),
+                            "durationMs", result.getDurationMs(),
+                            "message", result.getMessage() == null ? "" : result.getMessage()));
+        } catch (Exception e) {
+            log.warn("工具审计失败 {}", toolName);
         }
     }
 }
