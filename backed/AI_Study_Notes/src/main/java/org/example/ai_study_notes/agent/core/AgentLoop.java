@@ -1,13 +1,8 @@
 package org.example.ai_study_notes.agent.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.model.chat.response.ChatResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.example.ai_study_notes.agent.audit.AuditService;
 import org.example.ai_study_notes.agent.confirmation.AgentConfirmation;
 import org.example.ai_study_notes.agent.confirmation.ConfirmationService;
 import org.example.ai_study_notes.agent.config.AgentProperties;
@@ -16,9 +11,12 @@ import org.example.ai_study_notes.agent.contract.StopReason;
 import org.example.ai_study_notes.agent.context.ContextAssembler;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
+import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
 import org.example.ai_study_notes.agent.session.MessageService;
+import org.example.ai_study_notes.agent.skill.AgentSkill;
+import org.example.ai_study_notes.agent.skill.SkillService;
 import org.example.ai_study_notes.agent.tool.ToolContext;
 import org.example.ai_study_notes.agent.tool.ToolExecutionService;
 import org.example.ai_study_notes.agent.tool.ToolRegistry;
@@ -40,7 +38,7 @@ import java.util.UUID;
 @Service
 public class AgentLoop {
 
-    private final AgentAiClient aiClient;
+    private final AgentLlmClient llmClient;
     private final ToolRegistry toolRegistry;
     private final ToolExecutionService toolExecutionService;
     private final ConfirmationService confirmationService;
@@ -49,11 +47,14 @@ public class AgentLoop {
     private final EventStreamService eventStreamService;
     private final ContextAssembler contextAssembler;
     private final SystemPromptBuilder systemPromptBuilder;
+    private final MemoryService memoryService;
+    private final SkillService skillService;
+    private final AuditService auditService;
     private final RunRegistry runRegistry;
     private final ObjectMapper objectMapper;
     private final AgentProperties properties;
 
-    public AgentLoop(AgentAiClient aiClient,
+    public AgentLoop(AgentLlmClient llmClient,
                      ToolRegistry toolRegistry,
                      ToolExecutionService toolExecutionService,
                      ConfirmationService confirmationService,
@@ -62,10 +63,13 @@ public class AgentLoop {
                      EventStreamService eventStreamService,
                      ContextAssembler contextAssembler,
                      SystemPromptBuilder systemPromptBuilder,
+                     MemoryService memoryService,
+                     SkillService skillService,
+                     AuditService auditService,
                      RunRegistry runRegistry,
                      ObjectMapper objectMapper,
                      AgentProperties properties) {
-        this.aiClient = aiClient;
+        this.llmClient = llmClient;
         this.toolRegistry = toolRegistry;
         this.toolExecutionService = toolExecutionService;
         this.confirmationService = confirmationService;
@@ -74,6 +78,9 @@ public class AgentLoop {
         this.eventStreamService = eventStreamService;
         this.contextAssembler = contextAssembler;
         this.systemPromptBuilder = systemPromptBuilder;
+        this.memoryService = memoryService;
+        this.skillService = skillService;
+        this.auditService = auditService;
         this.runRegistry = runRegistry;
         this.objectMapper = objectMapper;
         this.properties = properties;
@@ -86,6 +93,8 @@ public class AgentLoop {
         ConversationEventStream stream = eventStreamService.getOrCreate(conversationId);
         String runId = "run-" + UUID.randomUUID();
         stream.emit(EventType.AGENT_START.value(), Map.of("runId", runId, "conversationId", conversationId));
+        auditService.log(userId, conversationId, runId, "agent_run_start",
+                Map.of("userTextLength", userText == null ? 0 : userText.length()));
         try {
             if (userText != null) {
                 AgentMessage userMessage = messageService.append(conversationId, "user", "text", userText, null);
@@ -98,6 +107,8 @@ public class AgentLoop {
             StopReason stopReason = loop(conversationId, userId, stream, runId);
             stream.emit(EventType.AGENT_END.value(), Map.of(
                     "runId", runId, "conversationId", conversationId, "stopReason", stopReason.value()));
+            auditService.log(userId, conversationId, runId, "agent_run_end",
+                    Map.of("stopReason", stopReason.value()));
         } catch (Exception e) {
             log.error("Agent run 失败 conversationId={}", conversationId, e);
             stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", e.getMessage()));
@@ -111,8 +122,14 @@ public class AgentLoop {
     }
 
     private StopReason loop(Long conversationId, Long userId, ConversationEventStream stream, String runId) {
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(SystemMessage.from(systemPromptBuilder.build()));
+        List<LlmMessage> messages = new ArrayList<>();
+        List<String> memories = userId == null ? java.util.List.of() : memoryService.injectable(userId);
+        List<String> skillBodies = skillService.activeSkills(conversationId).stream()
+                .map(AgentSkill::getBody).toList();
+        messages.add(LlmMessage.builder()
+                .role("system")
+                .content(systemPromptBuilder.build(memories, skillBodies))
+                .build());
         messages.addAll(contextAssembler.toLlmMessages(conversationId));
 
         int maxTurns = properties.getLoop().getMaxTurns();
@@ -122,49 +139,70 @@ public class AgentLoop {
             }
             stream.emit(EventType.TURN_START.value(), Map.of("runId", runId, "turn", turn));
 
-            ChatResponse response;
+            // 流式输出：收到 token 即推 message_start/message_update，结束后统一持久化
+            final String[] streamingMessageId = {null};
+            final int currentTurn = turn;
+            AgentLlmClient.LlmResponse response;
             try {
-                response = aiClient.chat(messages, toolRegistry.toLlmToolSpecifications());
+                response = llmClient.chatStream(
+                        messages,
+                        toolRegistry.activeDefinitions(conversationId, skillService.activatedTools(conversationId)),
+                        delta -> {
+                            if (delta == null || delta.isEmpty()) {
+                                return;
+                            }
+                            if (streamingMessageId[0] == null) {
+                                streamingMessageId[0] = "s-" + runId + "-" + currentTurn;
+                                stream.emit(EventType.MESSAGE_START.value(), Map.of(
+                                        "messageId", streamingMessageId[0], "role", "assistant", "type", "text"));
+                            }
+                            stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
+                                    "messageId", streamingMessageId[0], "delta", delta));
+                        });
             } catch (Exception e) {
                 log.error("LLM 调用失败 conversationId={}", conversationId, e);
-                stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", "模型调用失败: " + e.getMessage()));
+                stream.emit(EventType.ERROR.value(), Map.of("runId", runId, "message", e.getMessage()));
                 stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
                 return StopReason.ERROR;
             }
 
-            AiMessage aiMessage = response.aiMessage();
-            if (aiMessage.hasToolExecutionRequests()) {
+            List<LlmMessage.ToolCall> toolCalls = response.toolCalls();
+            if (toolCalls != null && !toolCalls.isEmpty()) {
+                if (streamingMessageId[0] != null) {
+                    stream.emit(EventType.MESSAGE_END.value(), Map.of("messageId", streamingMessageId[0]));
+                }
                 boolean awaitingConfirmation = false;
-                for (ToolExecutionRequest request : aiMessage.toolExecutionRequests()) {
-                    Map<String, Object> args = parseArguments(request.arguments());
+                for (LlmMessage.ToolCall call : toolCalls) {
+                    Map<String, Object> args = parseArguments(call.getArguments());
                     stream.emit(EventType.TOOL_EXECUTION_START.value(), Map.of(
-                            "toolCallId", request.id(), "toolName", request.name(), "status", "running"));
+                            "toolCallId", call.getId(), "toolName", call.getName(), "status", "running"));
 
-                    ToolResult result = toolExecutionService.execute(request.name(), args,
+                    ToolResult result = toolExecutionService.execute(call.getName(), args,
                             ToolContext.builder().userId(userId).conversationId(conversationId).build(), false);
 
                     if (result.isRequiresConfirmation()) {
                         AgentConfirmation confirmation = confirmationService.create(
-                                conversationId, request.name(), args, request.id());
+                                conversationId, call.getName(), args, call.getId());
                         messageService.append(conversationId, "assistant", "tool_call",
-                                request.arguments(), toJson(toolMeta(request.id(), request.name(), args, "pending")));
+                                call.getArguments(),
+                                toJson(toolMeta(call.getId(), call.getName(), args, "pending", response.reasoningContent())));
                         Map<String, Object> confirmMeta = new LinkedHashMap<>();
                         confirmMeta.put("confirmationId", confirmation.getId());
-                        confirmMeta.put("toolName", request.name());
-                        confirmMeta.put("toolCallId", request.id());
+                        confirmMeta.put("toolName", call.getName());
+                        confirmMeta.put("toolCallId", call.getId());
                         confirmMeta.put("payload", args);
                         AgentMessage confirmMessage = messageService.append(conversationId, "assistant", "confirmation",
-                                "需要您确认操作: " + request.name(), toJson(confirmMeta));
+                                "需要您确认操作: " + call.getName(), toJson(confirmMeta));
                         stream.emit(EventType.MESSAGE_START.value(), Map.of(
                                 "messageId", confirmMessage.getId(), "role", "assistant", "type", "confirmation",
-                                "confirmationId", confirmation.getId(), "toolName", request.name()));
+                                "confirmationId", confirmation.getId(), "toolName", call.getName()));
                         stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
-                                "messageId", confirmMessage.getId(), "delta", "需要您确认操作: " + request.name(),
-                                "confirmationId", confirmation.getId(), "toolName", request.name(), "payload", args));
+                                "messageId", confirmMessage.getId(), "delta", "需要您确认操作: " + call.getName(),
+                                "confirmationId", confirmation.getId(), "toolName", call.getName(), "payload", args));
                         stream.emit(EventType.MESSAGE_END.value(), Map.of(
                                 "messageId", confirmMessage.getId(), "confirmationId", confirmation.getId()));
                         stream.emit(EventType.TOOL_EXECUTION_END.value(), Map.of(
-                                "toolCallId", request.id(), "toolName", request.name(),
+                                "toolCallId", call.getId(), "toolName", call.getName(),
                                 "status", "awaiting_confirmation", "confirmationId", confirmation.getId(),
                                 "payload", args));
                         awaitingConfirmation = true;
@@ -173,13 +211,23 @@ public class AgentLoop {
 
                     String resultJson = toJson(result);
                     messageService.append(conversationId, "assistant", "tool_call",
-                            request.arguments(), toJson(toolMeta(request.id(), request.name(), args, "done")));
+                            call.getArguments(),
+                            toJson(toolMeta(call.getId(), call.getName(), args, "done", response.reasoningContent())));
                     messageService.append(conversationId, "tool", "tool_result", resultJson,
-                            toJson(toolMeta(request.id(), request.name(), args, result.getStatus().value())));
-                    messages.add(AiMessage.from(request));
-                    messages.add(ToolExecutionResultMessage.from(request.id(), request.name(), resultJson));
+                            toJson(toolMeta(call.getId(), call.getName(), args, result.getStatus().value(), null)));
+                    messages.add(LlmMessage.builder()
+                            .role("assistant")
+                            .content(null)
+                            .reasoningContent(response.reasoningContent())
+                            .toolCalls(List.of(call))
+                            .build());
+                    messages.add(LlmMessage.builder()
+                            .role("tool")
+                            .content(resultJson)
+                            .toolCallId(call.getId())
+                            .build());
                     stream.emit(EventType.TOOL_EXECUTION_END.value(), Map.of(
-                            "toolCallId", request.id(), "toolName", request.name(),
+                            "toolCallId", call.getId(), "toolName", call.getName(),
                             "status", result.getStatus().value(), "durationMs", result.getDurationMs()));
                 }
                 stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
@@ -189,13 +237,22 @@ public class AgentLoop {
                 continue;
             }
 
-            String text = aiMessage.text();
-            AgentMessage assistantMessage = messageService.append(conversationId, "assistant", "text", text, null);
-            stream.emit(EventType.MESSAGE_START.value(), Map.of(
-                    "messageId", assistantMessage.getId(), "role", "assistant", "type", "text"));
-            stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
-                    "messageId", assistantMessage.getId(), "delta", text));
-            stream.emit(EventType.MESSAGE_END.value(), Map.of("messageId", assistantMessage.getId()));
+            String text = response.content() == null ? "" : response.content();
+            Map<String, Object> meta = new LinkedHashMap<>();
+            if (response.reasoningContent() != null) {
+                meta.put("reasoningContent", response.reasoningContent());
+            }
+            messageService.append(conversationId, "assistant", "text", text,
+                    meta.isEmpty() ? null : toJson(meta));
+            if (streamingMessageId[0] == null) {
+                // 极端情况：模型无任何文本增量（如空回复），补发完整事件
+                streamingMessageId[0] = "s-" + runId + "-" + currentTurn;
+                stream.emit(EventType.MESSAGE_START.value(), Map.of(
+                        "messageId", streamingMessageId[0], "role", "assistant", "type", "text"));
+                stream.emit(EventType.MESSAGE_UPDATE.value(), Map.of(
+                        "messageId", streamingMessageId[0], "delta", text));
+            }
+            stream.emit(EventType.MESSAGE_END.value(), Map.of("messageId", streamingMessageId[0]));
             stream.emit(EventType.TURN_END.value(), Map.of("runId", runId, "turn", turn));
             return StopReason.STOP;
         }
@@ -215,12 +272,16 @@ public class AgentLoop {
         }
     }
 
-    private Map<String, Object> toolMeta(String toolCallId, String toolName, Map<String, Object> args, String status) {
+    private Map<String, Object> toolMeta(String toolCallId, String toolName, Map<String, Object> args,
+                                         String status, String reasoningContent) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("toolCallId", toolCallId);
         meta.put("toolName", toolName);
         meta.put("status", status);
         meta.put("args", args);
+        if (reasoningContent != null) {
+            meta.put("reasoningContent", reasoningContent);
+        }
         return meta;
     }
 

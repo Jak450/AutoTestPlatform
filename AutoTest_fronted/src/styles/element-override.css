@@ -1,0 +1,74 @@
+:root {
+  --el-color-primary: #2456E6;
+  --el-color-primary-light-3: #5B7FED;
+  --el-color-primary-light-5: #8CA6F2;
+  --el-color-primary-light-7: #BDCEF8;
+  --el-color-primary-light-8: #D5E0FA;
+  --el-color-primary-light-9: #E8EEFA;
+  --el-color-primary-dark-2: #1B45C4;
+  --el-border-radius-base: 6px;
+  --el-border-color: #DDE4F0;
+  --el-border-color-lighter: #EDF1F8;
+  --el-text-color-primary: #17233B;
+  --el-text-color-regular: #3D4A63;
+  --el-text-color-secondary: #7B879E;
+  --el-font-family: 'Inter', system-ui, sans-serif;
+}
+
+.el-table {
+  --el-table-border-color: #EDF1F8;
+  --el-table-header-bg-color: #F8FAFD;
+  --el-table-row-hover-bg-color: rgba(36, 86, 230, 0.06);
+}
+
+.el-table th.el-table__cell {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: #F8FAFD;
+}
+
+.el-table .el-table__cell {
+  font-size: 13px;
+}
+
+.el-button {
+  border-radius: var(--radius-btn);
+  font-weight: 500;
+}
+
+.el-button--primary {
+  --el-button-hover-bg-color: #1B45C4;
+  --el-button-active-bg-color: #173BA8;
+}
+
+.el-dialog {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.el-dialog__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius-input);
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}
+
+.el-tag {
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.el-message-box {
+  border-radius: 8px;
+}

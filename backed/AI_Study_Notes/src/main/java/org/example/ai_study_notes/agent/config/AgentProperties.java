@@ -15,6 +15,7 @@ public class AgentProperties {
     private Loop loop = new Loop();
     private Auth auth = new Auth();
     private String dataDir = "./agent-data";
+    private String skillsDir = "";
 
     @Data
     public static class DeepSeek {

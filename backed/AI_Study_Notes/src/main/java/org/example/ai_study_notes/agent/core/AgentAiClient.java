@@ -41,4 +41,14 @@ public class AgentAiClient {
         }
         return chatModel.chat(builder.build());
     }
+
+    /**
+     * 便捷调用：单轮 system + user 文本。
+     */
+    public String chat(String systemPrompt, String userMessage) {
+        List<dev.langchain4j.data.message.ChatMessage> messages = List.of(
+                dev.langchain4j.data.message.SystemMessage.from(systemPrompt),
+                dev.langchain4j.data.message.UserMessage.from(userMessage));
+        return chatModel.chat(ChatRequest.builder().messages(messages).build()).aiMessage().text();
+    }
 }

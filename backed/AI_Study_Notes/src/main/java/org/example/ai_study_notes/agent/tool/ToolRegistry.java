@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentMap;
 public class ToolRegistry {
 
     private final ConcurrentMap<String, ToolDefinition> definitions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Boolean> enabledOverrides = new ConcurrentHashMap<>();
 
     public void register(ToolDefinition definition) {
         ToolDefinition existing = definitions.putIfAbsent(definition.getName(), definition);
@@ -33,20 +34,55 @@ public class ToolRegistry {
         return definitions.containsKey(name);
     }
 
+    public boolean isEnabled(String name) {
+        return enabledOverrides.getOrDefault(name, true);
+    }
+
+    public void setEnabled(String name, boolean enabled) {
+        if (!definitions.containsKey(name)) {
+            throw new IllegalArgumentException("工具不存在: " + name);
+        }
+        enabledOverrides.put(name, enabled);
+    }
+
     public List<ToolDefinition> activeTools() {
         return definitions.values().stream()
-                .filter(ToolDefinition::isActiveByDefault)
+                .filter(d -> isEnabled(d.getName()) && d.isActiveByDefault())
                 .toList();
     }
 
     public List<ToolSpecification> toLlmToolSpecifications() {
+        return toLlmToolSpecifications(null, java.util.Set.of());
+    }
+
+    public List<ToolDefinition> activeDefinitions(Long conversationId, java.util.Set<String> extraToolNames) {
+        List<ToolDefinition> result = new ArrayList<>();
+        for (ToolDefinition definition : definitions.values()) {
+            boolean active = (definition.isActiveByDefault() && isEnabled(definition.getName()))
+                    || (extraToolNames != null && extraToolNames.contains(definition.getName()));
+            if (active) {
+                result.add(definition);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 按会话组装激活工具列表：默认激活工具 + 会话/技能激活工具。
+     */
+    public List<ToolSpecification> toLlmToolSpecifications(Long conversationId, java.util.Set<String> extraToolNames) {
         List<ToolSpecification> specs = new ArrayList<>();
-        for (ToolDefinition definition : activeTools()) {
-            specs.add(ToolSpecification.builder()
-                    .name(definition.getName())
-                    .description(definition.getDescription())
-                    .parameters(JsonSchemaToLlm.convert(definition.getInputSchema()))
-                    .build());
+        for (ToolDefinition definition : definitions.values()) {
+            boolean active = definition.isActiveByDefault()
+                    && isEnabled(definition.getName())
+                    || (extraToolNames != null && extraToolNames.contains(definition.getName()));
+            if (active) {
+                specs.add(ToolSpecification.builder()
+                        .name(definition.getName())
+                        .description(definition.getDescription())
+                        .parameters(JsonSchemaToLlm.convert(definition.getInputSchema()))
+                        .build());
+            }
         }
         return specs;
     }

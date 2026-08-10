@@ -1,6 +1,6 @@
 # Agent 模块（可交互测试 Agent）实现说明
 
-> 状态：P0 已完成（认证 / 会话 / SSE / AgentLoop / 工具 / 确认 / 前端登录+对话页）
+> 状态：P0 + P1 + P2 主体已完成
 > 依据：`docs/agent-design/` 下五份设计文档
 
 ## 1. 新增数据库表
@@ -116,15 +116,45 @@ agent:
 
 ## 8. 已实现 / 未实现
 
-已实现（P0）：AUTH-1、SESSION-1、STREAM-1、LOOP-1、TOOL-1、QUERY-1、EXEC-1（含确认）、UI-1、UI-2 主体，另含 UI-4/UI-5 的工具卡片与确认卡片。
+已实现：
 
-未实现（P1/P2，按 implementation-spec 顺序）：
+- P0：AUTH-1、SESSION-1、STREAM-1、LOOP-1、TOOL-1、QUERY-1、EXEC-1（含确认）、UI-1、UI-2/4/5 主体
+- P1：
+  - FILE-1：附件上传/列表/删除/解析（md/txt/pdf/doc/docx，10MB 限制，本地磁盘）
+  - GEN-1：parse_document / generate_cases / validate_cases / save_cases，草稿 case_preview 展示后确认入库
+  - TEMPLATE-1：模板 CRUD + 会话激活模板注入生成上下文
+  - MEMORY-1：记忆 CRUD + 覆盖确认 + Top-N 注入系统提示词
+  - COMPACT-1：LLM 分层压缩 + 摘要注入 + 手动 /compact
+  - MIDDLE-1：中间件链（输入清洗/输出预算/读写前置/循环检测/Guardrail），顺序测试钉住
+  - SKILL-1：SKILL.md 注册、list/load/unload、依赖工具激活、正文注入
+- P2：
+  - OBS-1：agent_audit_log 记录 run 生命周期与确认动作
+  - ADMIN-1：/api/agent/admin/tools 启停工具（admin），持久化到 agent_tool_registry
+  - CONTRACT-1：契约 JSON 落入 resources + ContractResourceTest 双向校验
+  - DEPLOY-1：deploy/Dockerfile、nginx SSE 配置、start-agent.sh
 
-- FILE-1 文件上传/解析、GEN-1 用例生成/校验/保存、TEMPLATE-1 模板、MEMORY-1 记忆
-- COMPACT-1 分层压缩、MIDDLE-1 中间件链、SKILL-1 技能加载
-- ADMIN-1 管理界面、OBS-1 RunJournal/token 计量、CONTRACT-1 契约双向校验、DEPLOY-1 Docker/nginx SSE 专项配置
-- 流式 token 输出目前为"整段 message_update + 前端渲染"，未做逐 token 推送
+已知限制（后续按需调整）：
+
+- 流式输出为逐 token（SSE stream=true + 增量 message_update），思考内容（reasoning_content）仅用于回传，未在前端展示
 - 确认后同一批多个工具调用仅保留首个待确认调用
+- 事件缓冲在 agent_end 后清空；run 极快完成时迟到的 SSE 连接靠前端 syncRunState 拉取详情兜底
+- 中间件 ReadBeforeWrite 为简化版（写前需本会话最近有查询标记）
+- Agent 模型层为自研 OpenAI 兼容客户端（Apache HttpClient 直接调 /chat/completions），
+  支持 DeepSeek thinking 模式 reasoning_content 回传；LangChain4j 仅保留给旧 AI 模块与单轮生成
+- 会话内已加载的技能状态（SkillService）为内存态，重启后需重新 load_skill
+
+### 记忆存储位置
+
+| 内容 | 存储 |
+|---|---|
+| 对话消息 | MySQL `agent_message` |
+| 会话摘要 | MySQL `agent_conversation.context_summary` |
+| 长期记忆 | MySQL `agent_memory` |
+| 附件文件/解析文本 | 磁盘 `{AGENT_DATA_DIR}/agent/files/{userId}/{conversationId}/` |
+| 附件元数据 | MySQL `agent_attachment` |
+| 确认记录 | MySQL `agent_confirmation` |
+| 激活的用例模板 | Redis `agent:conv:{conversationId}:activeTemplate`（TTL 7 天） |
+| 待确认的工具调用 | Redis `agent:confirm:{confirmationId}:pending`（TTL 10 分钟） |
 
 ## 9. 验证
 
@@ -136,4 +166,4 @@ npm install
 npm run build
 ```
 
-运行前提：MySQL（导入 `backed/init.sql`）、Redis、`DEEPSEEK_API_KEY` 环境变量。
+运行前提：MySQL（导入 `backed/init.sql`）、Redis、`DEEPSEEK_API_KEY` 环境变量；测试默认账号 admin/12345678。

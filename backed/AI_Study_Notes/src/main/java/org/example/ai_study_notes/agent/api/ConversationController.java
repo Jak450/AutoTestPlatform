@@ -8,6 +8,7 @@ import org.example.ai_study_notes.agent.auth.UserContext;
 import org.example.ai_study_notes.agent.contract.EventType;
 import org.example.ai_study_notes.agent.core.AgentLoop;
 import org.example.ai_study_notes.agent.core.RunRegistry;
+import org.example.ai_study_notes.agent.context.ContextCompactor;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
 import org.example.ai_study_notes.agent.session.AgentConversation;
@@ -58,6 +59,7 @@ public class ConversationController {
     private final RunRegistry runRegistry;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final ContextCompactor contextCompactor;
     private final Executor agentExecutor;
 
     public ConversationController(ConversationService conversationService,
@@ -67,6 +69,7 @@ public class ConversationController {
                                   RunRegistry runRegistry,
                                   RedisTemplate<String, Object> redisTemplate,
                                   ObjectMapper objectMapper,
+                                  ContextCompactor contextCompactor,
                                   @Qualifier("agentExecutor") Executor agentExecutor) {
         this.conversationService = conversationService;
         this.messageService = messageService;
@@ -75,6 +78,7 @@ public class ConversationController {
         this.runRegistry = runRegistry;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.contextCompactor = contextCompactor;
         this.agentExecutor = agentExecutor;
     }
 
@@ -115,6 +119,7 @@ public class ConversationController {
             messages.add(map);
         }
         data.put("messages", messages);
+        data.put("running", runRegistry.isRunning(id));
         return Result.success(data);
     }
 
@@ -139,11 +144,10 @@ public class ConversationController {
     @PostMapping("/{id}/compact")
     public Result<Map<String, Object>> compact(@PathVariable("id") Long id) {
         requireOwned(id);
-        int messageCount = messageService.list(id).size();
+        String summary = contextCompactor.compact(id);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "ok");
-        data.put("messageCount", messageCount);
-        data.put("note", "自动分层压缩将在 P1(COMPACT-1) 提供，当前仅返回统计");
+        data.put("summary", summary);
         return Result.success(data);
     }
 

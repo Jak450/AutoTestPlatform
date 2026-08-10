@@ -41,6 +41,27 @@
           <!-- 普通文本 -->
           <div v-if="msg.type === 'text'" class="bubble">{{ msg.content }}</div>
 
+          <!-- 文件消息 -->
+          <div v-else-if="msg.type === 'file'" class="bubble file-bubble">📄 {{ msg.content }}</div>
+
+          <!-- 用例草稿预览 -->
+          <div v-else-if="msg.type === 'case_preview'" class="case-preview-card">
+            <div class="preview-title">用例草稿（{{ msg.cases.length }} 条）</div>
+            <table class="preview-table">
+              <thead>
+                <tr><th>名称</th><th>方法</th><th>URL</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(c, i) in msg.cases" :key="i">
+                  <td>{{ c.name }}</td>
+                  <td>{{ c.method }}</td>
+                  <td class="preview-url">{{ c.url }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="preview-tip">确认无误后告诉 Agent 保存，将写入用例库（保存前需要确认）</div>
+          </div>
+
           <!-- 工具调用卡片 -->
           <div v-else-if="msg.type === 'tool_call'" class="tool-card">
             <div class="tool-card-header">
@@ -82,6 +103,8 @@
       </div>
 
       <div class="input-area">
+        <input ref="fileInput" type="file" style="display: none" @change="uploadFile" />
+        <el-button :disabled="!currentId || running" @click="$refs.fileInput.click()">上传</el-button>
         <el-input
           v-model="inputText"
           type="textarea"
@@ -119,6 +142,7 @@ export default {
     let eventSource = null
     let lastEventId = 0
     const messageList = ref(null)
+    const fileInput = ref(null)
     const token = localStorage.getItem('token') || ''
 
     const currentTitle = computed(() => {
@@ -173,6 +197,18 @@ export default {
 
     const renderHistoryMessage = (m) => {
       const meta = m.toolMeta || {}
+      if (m.type === 'file') {
+        return { key: `m${m.id}`, role: m.role || 'user', type: 'file', content: m.content || '' }
+      }
+      if (m.type === 'case_preview') {
+        let cases = []
+        try {
+          cases = JSON.parse(m.content || '[]')
+        } catch (e) {
+          cases = []
+        }
+        return { key: `m${m.id}`, role: 'assistant', type: 'case_preview', cases }
+      }
       if (m.type === 'tool_call') {
         return {
           key: `m${m.id}`,
@@ -271,42 +307,51 @@ export default {
           return
         }
         if (data.id) lastEventId = data.id
+        // 后端 SSE 负载嵌套在 data.data 下（data.id/data.type 在顶层）
+        const payload = data.data && typeof data.data === 'object' ? data.data : {}
         switch (data.type) {
           case 'agent_start':
             running.value = true
             break
           case 'message_start': {
-            if (data.type === 'confirmation') break
+            // 用户消息已本地渲染；其余消息重置流式条目，保证重连重放不重复
+            if (payload.role !== 'user') {
+              messages.value = messages.value.filter(
+                (m) => m.key !== `s${payload.messageId}` && m.key !== `m${payload.messageId}`
+              )
+            }
             break
           }
           case 'message_update': {
-            if (data.confirmationId) {
-              upsertConfirmation(data)
+            if (payload.confirmationId) {
+              upsertConfirmation(payload)
+            } else if (payload.type === 'case_preview' || payload.cases) {
+              upsertCasePreview(payload)
             } else {
-              upsertStreamingText(data)
+              upsertStreamingText(payload)
             }
             break
           }
           case 'message_end': {
-            flushStreamingMessage(data)
+            flushStreamingMessage(payload)
             break
           }
           case 'tool_execution_start':
-            upsertToolCard(data)
+            upsertToolCard(payload)
             break
           case 'tool_execution_end':
-            updateToolCard(data)
+            updateToolCard(payload)
             break
           case 'agent_end': {
-            if (data.stopReason === 'error') {
-              pushSystemMessage(data.errorMessage || '执行出错')
+            if (payload.stopReason === 'error') {
+              pushSystemMessage(payload.errorMessage || '执行出错')
             }
             running.value = false
             closeStream()
             break
           }
           case 'error':
-            pushSystemMessage(data.message || '发生错误')
+            pushSystemMessage(payload.message || '发生错误')
             break
           case 'heartbeat':
           default:
@@ -332,8 +377,26 @@ export default {
       namedEvents.forEach((type) => eventSource.addEventListener(type, handleData))
       eventSource.onmessage = handleData
       eventSource.onerror = () => {
-        // 连接错误：EventSource 会自动重连（携带 Last-Event-ID），无需处理
-        // 服务端 run 结束后会主动 complete，浏览器触发 error 事件，这里不做关闭
+        // 服务端主动关闭连接：可能是 run 已结束但我们错过了 agent_end，
+        // 拉取会话详情同步运行状态，避免一直卡在"运行中"
+        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+          syncRunState()
+        }
+      }
+    }
+
+    const syncRunState = async () => {
+      try {
+        const res = await axios.get(`/agent/conversations/${currentId.value}`)
+        if (res.data && res.data.code === 1) {
+          running.value = !!res.data.data.running
+          if (!running.value) {
+            messages.value = (res.data.data.messages || []).map(renderHistoryMessage)
+            scrollToBottom()
+          }
+        }
+      } catch (e) {
+        // ignore
       }
     }
 
@@ -357,7 +420,7 @@ export default {
     const flushStreamingMessage = (data) => {
       const key = `s${data.messageId}`
       const existing = messages.value.find((m) => m.key === key)
-      if (existing) {
+      if (existing && !messages.value.some((m) => m.key === `m${data.messageId}`)) {
         existing.key = `m${data.messageId}`
       }
     }
@@ -384,11 +447,10 @@ export default {
       }
       const target = messages.value.find((m) => m.key === key)
       if (data.status === 'awaiting_confirmation') {
-        target.type = 'confirmation'
-        target.toolName = data.toolName
-        target.confirmationId = data.confirmationId
-        target.payloadText = truncate(JSON.stringify(data.payload || {}), 200)
-        target.handled = false
+        // 确认卡片由 message_update 事件统一创建（key=c{confirmationId}），
+        // 这里移除工具卡片，避免同一次确认出现两张卡片
+        messages.value = messages.value.filter((m) => m.key !== key)
+        upsertConfirmation(data)
       } else {
         target.status = data.status
         if (data.durationMs != null) {
@@ -414,6 +476,42 @@ export default {
           payloadText: data.payload ? truncate(JSON.stringify(data.payload), 200) : '',
           handled: false
         })
+      }
+    }
+
+    const upsertCasePreview = (data) => {
+      const key = `p${data.messageId}`
+      const cases = data.cases || []
+      const existing = messages.value.find((m) => m.key === key)
+      if (existing) {
+        existing.cases = cases
+      } else {
+        messages.value.push({ key, role: 'assistant', type: 'case_preview', cases })
+      }
+    }
+
+    const uploadFile = async (event) => {
+      const file = event.target.files && event.target.files[0]
+      if (!file || !currentId.value) return
+      const formData = new FormData()
+      formData.append('file', file)
+      try {
+        const res = await axios.post(`/agent/conversations/${currentId.value}/files`, formData)
+        if (res.data && res.data.code === 1) {
+          messages.value.push({
+            key: `f${Date.now()}`,
+            role: 'user',
+            type: 'file',
+            content: res.data.data.fileName
+          })
+          scrollToBottom()
+        } else {
+          pushSystemMessage((res.data && res.data.msg) || '上传失败')
+        }
+      } catch (e) {
+        pushSystemMessage((e.response && e.response.data && e.response.data.msg) || '上传失败')
+      } finally {
+        event.target.value = ''
       }
     }
 
@@ -469,6 +567,8 @@ export default {
       inputText,
       running,
       messageList,
+      fileInput,
+      uploadFile,
       createConversation,
       switchConversation,
       deleteConversation,
@@ -634,6 +734,57 @@ export default {
   word-break: break-word;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.file-bubble {
+  background: #f0f9eb !important;
+  border-color: #e1f3d8 !important;
+  color: #529b2e;
+}
+
+.case-preview-card {
+  max-width: 85%;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-left: 3px solid #722ed1;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.preview-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.preview-table th,
+.preview-table td {
+  border: 1px solid #ebeef5;
+  padding: 6px 8px;
+  text-align: left;
+  word-break: break-all;
+}
+
+.preview-table th {
+  background: #f5f7fa;
+  color: #606266;
+}
+
+.preview-url {
+  max-width: 280px;
+}
+
+.preview-tip {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 12px;
 }
 
 .tool-card {

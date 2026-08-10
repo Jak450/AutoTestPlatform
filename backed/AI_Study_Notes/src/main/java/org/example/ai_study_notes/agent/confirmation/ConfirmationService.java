@@ -5,14 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 用户确认服务：写/执行类工具必须先创建确认记录，批准后才执行。
@@ -22,14 +23,19 @@ import java.util.concurrent.ConcurrentMap;
 public class ConfirmationService {
 
     private static final long CONFIRMATION_TTL_MINUTES = 10;
+    private static final String PENDING_PREFIX = "agent:confirm:";
+    private static final String PENDING_SUFFIX = ":pending";
 
     private final ConfirmationMapper confirmationMapper;
     private final ObjectMapper objectMapper;
-    private final ConcurrentMap<Long, PendingToolCall> pendingCalls = new ConcurrentHashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    public ConfirmationService(ConfirmationMapper confirmationMapper, ObjectMapper objectMapper) {
+    public ConfirmationService(ConfirmationMapper confirmationMapper,
+                               ObjectMapper objectMapper,
+                               RedisTemplate<String, Object> redisTemplate) {
         this.confirmationMapper = confirmationMapper;
         this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -48,7 +54,9 @@ public class ConfirmationService {
                 .expiresAt(LocalDateTime.now().plusMinutes(CONFIRMATION_TTL_MINUTES))
                 .build();
         confirmationMapper.insert(confirmation);
-        pendingCalls.put(confirmation.getId(), new PendingToolCall(toolName, payload, payloadJson, toolCallId));
+        redisTemplate.opsForValue().set(pendingKey(confirmation.getId()),
+                pendingToMap(new PendingToolCall(toolName, payload, payloadJson, toolCallId)),
+                CONFIRMATION_TTL_MINUTES, TimeUnit.MINUTES);
         return confirmation;
     }
 
@@ -71,7 +79,7 @@ public class ConfirmationService {
         update.setStatus("approved");
         update.setRespondedAt(LocalDateTime.now());
         confirmationMapper.updateById(update);
-        return pendingCalls.remove(confirmation.getId());
+        return takePending(confirmationId);
     }
 
     public PendingToolCall reject(Long conversationId, Long confirmationId) {
@@ -87,7 +95,14 @@ public class ConfirmationService {
         update.setStatus("rejected");
         update.setRespondedAt(LocalDateTime.now());
         confirmationMapper.updateById(update);
-        return pendingCalls.remove(confirmation.getId());
+        return takePending(confirmationId);
+    }
+
+    private PendingToolCall takePending(Long confirmationId) {
+        String key = pendingKey(confirmationId);
+        Object value = redisTemplate.opsForValue().get(key);
+        redisTemplate.delete(key);
+        return mapToPending(value);
     }
 
     public AgentConfirmation getOwned(Long conversationId, Long confirmationId) {
@@ -117,6 +132,31 @@ public class ConfirmationService {
         } catch (Exception e) {
             throw new IllegalStateException("payload hash 计算失败", e);
         }
+    }
+
+    private Map<String, Object> pendingToMap(PendingToolCall pending) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("toolName", pending.getToolName());
+        map.put("args", pending.getArgs());
+        map.put("argsJson", pending.getArgsJson());
+        map.put("toolCallId", pending.getToolCallId());
+        return map;
+    }
+
+    @SuppressWarnings("unchecked")
+    private PendingToolCall mapToPending(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return null;
+        }
+        return new PendingToolCall(
+                String.valueOf(map.get("toolName")),
+                (Map<String, Object>) map.get("args"),
+                String.valueOf(map.get("argsJson")),
+                String.valueOf(map.get("toolCallId")));
+    }
+
+    private String pendingKey(Long confirmationId) {
+        return PENDING_PREFIX + confirmationId + PENDING_SUFFIX;
     }
 
     @Data

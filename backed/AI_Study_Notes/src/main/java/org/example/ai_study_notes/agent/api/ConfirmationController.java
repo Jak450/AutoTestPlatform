@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.Pojo.Result;
+import org.example.ai_study_notes.agent.audit.AuditService;
 import org.example.ai_study_notes.agent.auth.UserContext;
 import org.example.ai_study_notes.agent.confirmation.AgentConfirmation;
 import org.example.ai_study_notes.agent.confirmation.ConfirmationService;
@@ -45,6 +46,7 @@ public class ConfirmationController {
     private final RunRegistry runRegistry;
     private final ObjectMapper objectMapper;
     private final Executor agentExecutor;
+    private final AuditService auditService;
 
     public ConfirmationController(ConversationService conversationService,
                                   ConfirmationService confirmationService,
@@ -54,6 +56,7 @@ public class ConfirmationController {
                                   AgentLoop agentLoop,
                                   RunRegistry runRegistry,
                                   ObjectMapper objectMapper,
+                                  AuditService auditService,
                                   @Qualifier("agentExecutor") Executor agentExecutor) {
         this.conversationService = conversationService;
         this.confirmationService = confirmationService;
@@ -63,6 +66,7 @@ public class ConfirmationController {
         this.agentLoop = agentLoop;
         this.runRegistry = runRegistry;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
         this.agentExecutor = agentExecutor;
     }
 
@@ -82,6 +86,9 @@ public class ConfirmationController {
             if ("rejected".equalsIgnoreCase(decision)) {
                 ConfirmationService.PendingToolCall pending = confirmationService.reject(conversationId, confirmationId);
                 appendRejectedResult(conversationId, pending);
+                auditService.log(userId, conversationId, null, "confirmation_rejected",
+                        Map.of("confirmationId", confirmationId,
+                                "toolName", pending == null ? "unknown" : pending.getToolName()));
                 resume(conversationId, userId);
                 return Result.success(Map.of("status", "rejected"));
             }
@@ -94,6 +101,9 @@ public class ConfirmationController {
             }
             ToolResult result = toolExecutionService.execute(pending.getToolName(), pending.getArgs(),
                     ToolContext.builder().userId(userId).conversationId(conversationId).build(), true);
+            auditService.log(userId, conversationId, null, "confirmation_approved",
+                    Map.of("confirmationId", confirmationId, "toolName", pending.getToolName(),
+                            "status", result.getStatus().value()));
 
             Map<String, Object> meta = new LinkedHashMap<>();
             meta.put("toolCallId", pending.getToolCallId());

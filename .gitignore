@@ -13,6 +13,9 @@ Thumbs.db
 *.log
 logs/
 
+# 本地运行 PID 文件
+*.pid
+
 # Agent 模块本地数据（附件、工具输出等）
 agent-data/
 

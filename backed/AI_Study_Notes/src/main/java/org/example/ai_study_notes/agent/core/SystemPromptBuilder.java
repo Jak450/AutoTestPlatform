@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class SystemPromptBuilder {
 
-    public String build() {
-        return """
+    public String build(java.util.List<String> memories, java.util.List<String> skillBodies) {
+        StringBuilder prompt = new StringBuilder("""
                 你是 AutoTestPlatform 的测试助手。
 
                 能力范围：
@@ -28,6 +28,24 @@ public class SystemPromptBuilder {
                 5. 涉及执行测试时说明影响范围（用例数、执行次数、并发数）。
                 6. 所有 JSON 参数必须严格符合工具输入 Schema。
                 7. 回答使用中文，简洁、结构化。
-                """;
+                8. 当用户要求"根据需求文档生成测试用例"时，流程为：
+                   a. 用 list_files 找到文档，用 parse_document 或 read_file_content 读取内容；
+                   b. 调用 generate_cases 生成用例草稿（可先 load_template 指定模板）；
+                   c. 向用户展示草稿并确认；
+                   d. 用户确认后调用 save_cases 保存到用例库（保存需要用户确认）。
+                """);
+        if (memories != null && !memories.isEmpty()) {
+            prompt.append("\n\n相关记忆（用户确认过的偏好与约定，供参考）:\n");
+            for (String memory : memories) {
+                prompt.append("- ").append(memory).append('\n');
+            }
+        }
+        if (skillBodies != null && !skillBodies.isEmpty()) {
+            prompt.append("\n\n已加载技能正文（作为执行规范）:\n");
+            for (String body : skillBodies) {
+                prompt.append(body).append("\n---\n");
+            }
+        }
+        return prompt.toString();
     }
 }

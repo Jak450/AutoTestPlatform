@@ -47,6 +47,10 @@ public class ConversationService {
         return conversation;
     }
 
+    public AgentConversation get(Long conversationId) {
+        return conversationMapper.selectById(conversationId);
+    }
+
     public void delete(Long userId, Long conversationId) {
         if (getOwned(userId, conversationId) == null) {
             throw new IllegalArgumentException("会话不存在或无权访问");
@@ -60,6 +64,10 @@ public class ConversationService {
         update.setId(conversationId);
         update.setUpdatedAt(LocalDateTime.now());
         conversationMapper.updateById(update);
+    }
+
+    public void update(AgentConversation conversation) {
+        conversationMapper.updateById(conversation);
     }
 
     public void deleteExpired(LocalDateTime cutoff) {
