@@ -1,9 +1,13 @@
 <template>
   <div class="login-page">
+    <div class="login-brand">
+      <Logo />
+      <h1 class="brand-title">自动化测试平台</h1>
+      <p class="brand-desc">项目 · 用例 · 执行 · 报告 · AI Agent，一张图纸管到底</p>
+    </div>
     <div class="login-card">
-      <h2 class="login-title">自动化测试平台</h2>
-      <p class="login-subtitle">请登录后使用 Agent 与测试功能</p>
-      <el-form :model="form" @submit.prevent="handleLogin">
+      <h2 class="card-title">登录</h2>
+      <el-form @submit.prevent="handleLogin">
         <el-form-item>
           <el-input v-model="form.username" placeholder="用户名" size="large" />
         </el-form-item>
@@ -11,11 +15,9 @@
           <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password
                     @keyup.enter="handleLogin" />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" size="large" class="login-button" :loading="loading" @click="handleLogin">
-            登 录
-          </el-button>
-        </el-form-item>
+        <el-button type="primary" size="large" class="login-btn" :loading="loading" @click="handleLogin">
+          登录
+        </el-button>
       </el-form>
       <el-alert v-if="errorMsg" :title="errorMsg" type="error" :closable="false" class="login-error" />
     </div>
@@ -26,9 +28,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import Logo from '../components/ui/Logo.vue'
 
 export default {
   name: 'Login',
+  components: { Logo },
   setup() {
     const router = useRouter()
     const form = ref({ username: 'admin', password: '' })
@@ -68,36 +72,47 @@ export default {
 
 <style scoped>
 .login-page {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f2236 0%, #1577ff 100%);
+  gap: 80px;
+  padding: 40px;
+  flex-wrap: wrap;
+}
+
+.login-brand {
+  max-width: 380px;
+}
+
+.brand-title {
+  margin-top: 18px;
+  font-size: 30px;
+  letter-spacing: -0.5px;
+}
+
+.brand-desc {
+  margin-top: 10px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .login-card {
-  width: 400px;
-  padding: 40px 36px 32px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-panel);
+  padding: 32px 30px;
 }
 
-.login-title {
-  margin: 0 0 8px;
-  text-align: center;
-  color: #1f2d3d;
-  font-size: 24px;
+.card-title {
+  font-size: 20px;
+  margin-bottom: 20px;
 }
 
-.login-subtitle {
-  margin: 0 0 28px;
-  text-align: center;
-  color: #8c939d;
-  font-size: 13px;
-}
-
-.login-button {
+.login-btn {
   width: 100%;
 }
 

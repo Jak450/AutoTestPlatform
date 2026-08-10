@@ -1,105 +1,25 @@
 <template>
   <div class="agent-page">
-    <!-- 左侧会话列表 -->
-    <div class="conversation-sidebar">
-      <div class="sidebar-header">
-        <span class="sidebar-title">会话列表</span>
-        <el-button type="primary" size="small" @click="createConversation">新建会话</el-button>
-      </div>
-      <div class="conversation-list">
-        <div
-          v-for="conv in conversations"
-          :key="conv.id"
-          class="conversation-item"
-          :class="{ active: conv.id === currentId }"
-          @click="switchConversation(conv.id)"
-        >
-          <span class="conv-title">{{ conv.title }}</span>
-          <span class="conv-delete" @click.stop="deleteConversation(conv.id)">×</span>
-        </div>
-        <div v-if="!conversations.length" class="empty-list">暂无会话，点击上方新建</div>
-      </div>
-    </div>
+    <ConversationList
+      :conversations="conversations"
+      :current-id="currentId"
+      @create="createConversation"
+      @select="switchConversation"
+      @remove="deleteConversation"
+    />
 
-    <!-- 右侧聊天区 -->
     <div class="chat-area">
-      <div class="chat-header">
+      <div class="chat-head">
         <span class="chat-title">{{ currentTitle }}</span>
-        <div>
-          <el-button v-if="running" size="small" type="warning" @click="cancelRun">停止</el-button>
-          <el-tag v-if="running" size="small" type="primary" effect="dark">运行中</el-tag>
-        </div>
+        <el-button v-if="running" size="small" type="warning" @click="cancelRun">停止</el-button>
       </div>
 
       <div ref="messageList" class="message-list">
-        <div v-if="!currentId" class="empty-chat">
-          <p>新建一个会话，或从左侧选择会话开始</p>
-          <p class="tip">示例：查看项目列表 / 项目 1 下有哪些用例 / 执行用例 1、2</p>
+        <div v-if="!currentId" class="chat-empty">
+          <p>新建会话，或从左侧选择</p>
+          <p class="chat-hint">例：查看项目列表 / 根据上传文档生成用例</p>
         </div>
-
-        <div v-for="msg in messages" :key="msg.key" class="message" :class="msg.role">
-          <!-- 普通文本 -->
-          <div v-if="msg.type === 'text'" class="bubble">{{ msg.content }}</div>
-
-          <!-- 文件消息 -->
-          <div v-else-if="msg.type === 'file'" class="bubble file-bubble">📄 {{ msg.content }}</div>
-
-          <!-- 用例草稿预览 -->
-          <div v-else-if="msg.type === 'case_preview'" class="case-preview-card">
-            <div class="preview-title">用例草稿（{{ msg.cases.length }} 条）</div>
-            <table class="preview-table">
-              <thead>
-                <tr><th>名称</th><th>方法</th><th>URL</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="(c, i) in msg.cases" :key="i">
-                  <td>{{ c.name }}</td>
-                  <td>{{ c.method }}</td>
-                  <td class="preview-url">{{ c.url }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="preview-tip">确认无误后告诉 Agent 保存，将写入用例库（保存前需要确认）</div>
-          </div>
-
-          <!-- 工具调用卡片 -->
-          <div v-else-if="msg.type === 'tool_call'" class="tool-card">
-            <div class="tool-card-header">
-              <span class="tool-name">{{ msg.toolName }}</span>
-              <el-tag size="small" :type="msg.status === 'success' ? 'success' : (msg.status === 'error' ? 'danger' : 'warning')">
-                {{ msg.status === 'running' ? '运行中' : msg.status }}
-              </el-tag>
-            </div>
-            <div class="tool-card-body" v-if="msg.argsText">参数：{{ msg.argsText }}</div>
-          </div>
-
-          <!-- 工具结果卡片 -->
-          <div v-else-if="msg.type === 'tool_result'" class="tool-card result">
-            <div class="tool-card-header">
-              <span class="tool-name">{{ msg.toolName }}</span>
-              <el-tag size="small" :type="msg.status === 'success' ? 'success' : 'danger'">{{ msg.status }}</el-tag>
-            </div>
-            <div class="tool-card-body">{{ msg.content }}</div>
-          </div>
-
-          <!-- 确认卡片 -->
-          <div v-else-if="msg.type === 'confirmation'" class="confirm-card">
-            <div class="confirm-title">需要确认</div>
-            <div class="confirm-tool">操作：{{ msg.toolName }}</div>
-            <div class="confirm-payload" v-if="msg.payloadText">内容：{{ msg.payloadText }}</div>
-            <div class="confirm-actions">
-              <el-button size="small" type="primary" :disabled="msg.handled" @click="respondConfirmation(msg, 'approved')">
-                批准
-              </el-button>
-              <el-button size="small" type="danger" :disabled="msg.handled" @click="respondConfirmation(msg, 'rejected')">
-                拒绝
-              </el-button>
-            </div>
-          </div>
-
-          <!-- 系统消息 -->
-          <div v-else-if="msg.type === 'system'" class="system-msg">{{ msg.content }}</div>
-        </div>
+        <MessageItem v-for="msg in messages" :key="msg.key" :msg="msg" @confirm="respondConfirmation" />
       </div>
 
       <div class="input-area">
@@ -110,13 +30,12 @@
           type="textarea"
           :rows="2"
           resize="none"
-          placeholder="输入消息，Enter 发送（Shift+Enter 换行）"
+          placeholder="输入消息…"
           :disabled="!currentId"
           @keydown.enter.exact.prevent="sendMessage"
         />
         <el-button
           type="primary"
-          class="send-button"
           :disabled="running || !currentId || !inputText.trim()"
           @click="sendMessage"
         >
@@ -124,21 +43,30 @@
         </el-button>
       </div>
     </div>
+
+    <ResourcePanel :files="files" :templates="templates" :memories="memories" />
   </div>
 </template>
 
 <script>
 import { ref, computed, nextTick } from 'vue'
 import axios from 'axios'
+import ConversationList from '../components/agent/ConversationList.vue'
+import MessageItem from '../components/agent/MessageItem.vue'
+import ResourcePanel from '../components/agent/ResourcePanel.vue'
 
 export default {
   name: 'Agent',
+  components: { ConversationList, MessageItem, ResourcePanel },
   setup() {
     const conversations = ref([])
     const currentId = ref(null)
     const messages = ref([])
     const inputText = ref('')
     const running = ref(false)
+    const files = ref([])
+    const templates = ref([])
+    const memories = ref([])
     let eventSource = null
     let lastEventId = 0
     const messageList = ref(null)
@@ -156,6 +84,25 @@ export default {
           messageList.value.scrollTop = messageList.value.scrollHeight
         }
       })
+    }
+
+    const loadResources = async () => {
+      if (!currentId.value) {
+        files.value = []
+        return
+      }
+      try {
+        const [fr, tr, mr] = await Promise.all([
+          axios.get(`/agent/conversations/${currentId.value}/files`),
+          axios.get('/agent/templates'),
+          axios.get('/agent/memory')
+        ])
+        files.value = (fr.data && fr.data.data) || []
+        templates.value = (tr.data && tr.data.data) || []
+        memories.value = (mr.data && mr.data.data) || []
+      } catch (e) {
+        // 资源加载失败不阻塞主流程
+      }
     }
 
     const loadConversations = async () => {
@@ -193,6 +140,7 @@ export default {
         messages.value = (data.messages || []).map(renderHistoryMessage)
         scrollToBottom()
       }
+      loadResources()
     }
 
     const renderHistoryMessage = (m) => {
@@ -263,6 +211,7 @@ export default {
         currentId.value = null
         messages.value = []
         running.value = false
+        files.value = []
         if (conversations.value.length) {
           switchConversation(conversations.value[0].id)
         }
@@ -505,6 +454,7 @@ export default {
             content: res.data.data.fileName
           })
           scrollToBottom()
+          loadResources()
         } else {
           pushSystemMessage((res.data && res.data.msg) || '上传失败')
         }
@@ -566,6 +516,9 @@ export default {
       messages,
       inputText,
       running,
+      files,
+      templates,
+      memories,
       messageList,
       fileInput,
       uploadFile,
@@ -583,283 +536,60 @@ export default {
 <style scoped>
 .agent-page {
   display: flex;
-  height: calc(100vh - 100px);
-  background: #fff;
-  border-radius: 8px;
+  height: calc(100vh - 104px);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
   overflow: hidden;
-}
-
-.conversation-sidebar {
-  width: 240px;
-  border-right: 1px solid #ebeef5;
-  display: flex;
-  flex-direction: column;
-  background: #f7f8fa;
-}
-
-.sidebar-header {
-  padding: 14px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.sidebar-title {
-  font-weight: 600;
-  color: #303133;
-}
-
-.conversation-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.conversation-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  margin-bottom: 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #303133;
-  font-size: 14px;
-}
-
-.conversation-item:hover {
-  background: #ecf5ff;
-}
-
-.conversation-item.active {
-  background: #d9ecff;
-  color: #1577ff;
-  font-weight: 500;
-}
-
-.conv-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conv-delete {
-  color: #c0c4cc;
-  font-size: 16px;
-  padding: 0 4px;
-}
-
-.conv-delete:hover {
-  color: #f56c6c;
-}
-
-.empty-list {
-  color: #909399;
-  font-size: 13px;
-  text-align: center;
-  padding: 24px 8px;
 }
 
 .chat-area {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
 }
 
-.chat-header {
-  height: 56px;
-  padding: 0 20px;
+.chat-head {
+  height: 52px;
+  padding: 0 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #ebeef5;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
 }
 
 .chat-title {
-  font-size: 16px;
+  font-family: var(--font-display);
   font-weight: 600;
-  color: #303133;
+  font-size: 15px;
 }
 
 .message-list {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: #fafafa;
 }
 
-.empty-chat {
+.chat-empty {
   text-align: center;
-  color: #909399;
-  padding-top: 120px;
-  font-size: 14px;
+  padding-top: 100px;
+  color: var(--ink-muted);
 }
 
-.empty-chat .tip {
+.chat-hint {
+  margin-top: 6px;
   font-size: 12px;
-  color: #c0c4cc;
-  margin-top: 8px;
-}
-
-.message {
-  margin-bottom: 14px;
-  display: flex;
-}
-
-.message.user {
-  justify-content: flex-end;
-}
-
-.message.user .bubble {
-  background: #1577ff;
-  color: #fff;
-  border-radius: 10px 10px 2px 10px;
-}
-
-.message.assistant .bubble,
-.message.tool .bubble,
-.message.system .bubble {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px 10px 10px 2px;
-}
-
-.bubble {
-  max-width: 75%;
-  padding: 10px 14px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.file-bubble {
-  background: #f0f9eb !important;
-  border-color: #e1f3d8 !important;
-  color: #529b2e;
-}
-
-.case-preview-card {
-  max-width: 85%;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-left: 3px solid #722ed1;
-  border-radius: 6px;
-  padding: 12px 14px;
-  font-size: 13px;
-}
-
-.preview-title {
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.preview-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.preview-table th,
-.preview-table td {
-  border: 1px solid #ebeef5;
-  padding: 6px 8px;
-  text-align: left;
-  word-break: break-all;
-}
-
-.preview-table th {
-  background: #f5f7fa;
-  color: #606266;
-}
-
-.preview-url {
-  max-width: 280px;
-}
-
-.preview-tip {
-  margin-top: 8px;
-  color: #909399;
-  font-size: 12px;
-}
-
-.tool-card {
-  max-width: 75%;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-left: 3px solid #1577ff;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 13px;
-}
-
-.tool-card.result {
-  border-left-color: #67c23a;
-}
-
-.tool-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.tool-name {
-  font-weight: 600;
-  color: #303133;
-}
-
-.tool-card-body {
-  color: #606266;
-  word-break: break-all;
-}
-
-.confirm-card {
-  max-width: 75%;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 13px;
-}
-
-.confirm-title {
-  font-weight: 600;
-  color: #d46b08;
-  margin-bottom: 6px;
-}
-
-.confirm-tool,
-.confirm-payload {
-  color: #874d00;
-  word-break: break-all;
-  margin-bottom: 4px;
-}
-
-.confirm-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-}
-
-.system-msg {
-  color: #f56c6c;
-  font-size: 13px;
+  color: var(--ink-muted);
 }
 
 .input-area {
   display: flex;
   gap: 10px;
+  align-items: flex-end;
   padding: 12px 16px;
-  border-top: 1px solid #ebeef5;
-  background: #fff;
-}
-
-.send-button {
-  align-self: flex-end;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
 }
 </style>
