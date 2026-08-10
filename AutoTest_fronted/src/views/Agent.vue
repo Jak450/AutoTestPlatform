@@ -44,7 +44,7 @@
       </div>
     </div>
 
-    <ResourcePanel :files="files" :templates="templates" :memories="memories" />
+    <ResourcePanel :files="files" :templates="templates" :memories="memories" @confirm-memory="confirmMemory" />
   </div>
 </template>
 
@@ -340,7 +340,19 @@ export default {
         if (res.data && res.data.code === 1) {
           running.value = !!res.data.data.running
           if (!running.value) {
+            // 保留确认卡的已处理状态，避免刷新后被重置可重复点击
+            const handledMap = new Map()
+            messages.value.forEach((m) => {
+              if (m.type === 'confirmation' && m.confirmationId) {
+                handledMap.set(m.confirmationId, m.handled)
+              }
+            })
             messages.value = (res.data.data.messages || []).map(renderHistoryMessage)
+            messages.value.forEach((m) => {
+              if (m.type === 'confirmation' && handledMap.has(m.confirmationId)) {
+                m.handled = handledMap.get(m.confirmationId)
+              }
+            })
             scrollToBottom()
           }
         }
@@ -354,6 +366,20 @@ export default {
       if (data.role === 'user') return
       const key = `s${data.messageId}`
       const existing = messages.value.find((m) => m.key === key)
+      if (data.thinking !== undefined) {
+        if (existing) {
+          existing.thinking = data.thinking
+        } else if (data.thinking) {
+          messages.value.push({
+            key,
+            role: 'assistant',
+            type: 'text',
+            content: '',
+            thinking: true
+          })
+        }
+        return
+      }
       if (existing) {
         existing.content += data.delta || ''
       } else {
@@ -480,6 +506,15 @@ export default {
       }
     }
 
+    const confirmMemory = async (memory) => {
+      try {
+        await axios.post(`/agent/memory/${memory.id}/confirm`)
+        loadResources()
+      } catch (e) {
+        pushSystemMessage((e.response && e.response.data && e.response.data.msg) || '确认记忆失败')
+      }
+    }
+
     const cancelRun = async () => {
       try {
         await axios.post(`/agent/conversations/${currentId.value}/cancel`)
@@ -527,7 +562,8 @@ export default {
       deleteConversation,
       sendMessage,
       cancelRun,
-      respondConfirmation
+      respondConfirmation,
+      confirmMemory
     }
   }
 }

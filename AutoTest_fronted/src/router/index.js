@@ -22,6 +22,15 @@ const routes = [
     }
   },
   {
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('../views/Admin.vue'),
+    meta: {
+      title: '系统管理',
+      requiresAdmin: true
+    }
+  },
+  {
     path: '/ai-requirement',
     name: 'AiRequirement',
     component: () => import('../views/AiRequirement.vue'),
@@ -111,7 +120,22 @@ router.beforeEach((to, from, next) => {
   } else if (to.path === '/login' && token) {
     next('/')
   } else {
-    next()
+    // 管理员页面守卫
+    if (to.meta && to.meta.requiresAdmin) {
+      let user = null
+      try {
+        user = JSON.parse(localStorage.getItem('user') || 'null')
+      } catch (e) {
+        user = null
+      }
+      if (!user || user.role !== 'admin') {
+        next('/agent')
+      } else {
+        next()
+      }
+    } else {
+      next()
+    }
   }
 })
 

@@ -29,6 +29,7 @@
         </template>
       </el-dropdown>
       <router-link to="/ai-requirement" class="nav-item">AI 需求分析</router-link>
+      <router-link v-if="isAdmin" to="/admin" class="nav-item">系统管理</router-link>
     </nav>
     <div class="topnav-right">
       <span class="user-name">{{ currentUser?.displayName || currentUser?.username }}</span>
@@ -49,6 +50,7 @@
       <router-link to="/ui-use-cases" class="drawer-item" @click="drawerVisible = false">UI · 用例管理</router-link>
       <router-link to="/ui-batch-execute" class="drawer-item" @click="drawerVisible = false">UI · 批量执行</router-link>
       <router-link to="/ai-requirement" class="drawer-item" @click="drawerVisible = false">AI 需求分析</router-link>
+      <router-link v-if="isAdmin" to="/admin" class="drawer-item" @click="drawerVisible = false">系统管理</router-link>
     </div>
   </el-drawer>
 </template>
@@ -63,6 +65,11 @@ export default {
     return {
       currentUser: JSON.parse(localStorage.getItem('user') || 'null'),
       drawerVisible: false
+    }
+  },
+  computed: {
+    isAdmin() {
+      return this.currentUser && this.currentUser.role === 'admin'
     }
   },
   methods: {

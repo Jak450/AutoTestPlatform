@@ -13,7 +13,15 @@
     </div>
     <div class="rp-group">
       <div class="rp-group-title mono">记忆</div>
-      <div v-if="memories.length" class="rp-item" v-for="m in memories" :key="m.id || m.key">{{ m.key }}</div>
+      <div v-if="memories.length" class="rp-item" v-for="m in memories" :key="m.id || m.key">
+        <div class="rp-memory-line">
+          <span>{{ m.key }}</span>
+          <el-tag v-if="m.confirmed === 0" size="small" type="warning">待确认</el-tag>
+        </div>
+        <el-button v-if="m.confirmed === 0" size="small" type="primary" plain @click="$emit('confirm-memory', m)">
+          确认
+        </el-button>
+      </div>
       <p v-else class="rp-empty">暂无记忆</p>
     </div>
   </aside>
@@ -26,7 +34,8 @@ export default {
     files: { type: Array, default: () => [] },
     templates: { type: Array, default: () => [] },
     memories: { type: Array, default: () => [] }
-  }
+  },
+  emits: ['confirm-memory']
 }
 </script>
 
@@ -60,6 +69,12 @@ export default {
   padding: 4px 0;
   border-bottom: 1px dashed var(--line-soft);
   word-break: break-all;
+}
+.rp-memory-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 .rp-empty {
   font-size: 12px;

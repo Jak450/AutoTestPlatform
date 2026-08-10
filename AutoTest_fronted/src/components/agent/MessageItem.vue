@@ -2,7 +2,8 @@
   <div class="msg" :class="`msg-${msg.role}`">
     <!-- 文本 -->
     <div v-if="msg.type === 'text'" class="bubble" :class="msg.role === 'user' ? 'bubble-user' : 'bubble-ai'">
-      {{ msg.content }}
+      <span v-if="msg.thinking && !msg.content" class="thinking">思考中…</span>
+      <template v-else>{{ msg.content }}</template>
     </div>
 
     <!-- 文件 -->
@@ -215,5 +216,10 @@ export default {
 .sys-msg {
   color: var(--danger);
   font-size: 13px;
+}
+.thinking {
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-style: italic;
 }
 </style>
