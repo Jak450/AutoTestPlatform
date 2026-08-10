@@ -1,0 +1,8 @@
+{"id":"query_projects","prompt":"查看当前平台有哪些项目","expectedTools":["list_projects"],"successCriteria":{"textContains":"项目"}}
+{"id":"query_use_cases","prompt":"查询项目 1 下有哪些测试用例","expectedTools":["list_use_cases"],"successCriteria":{"textContains":"用例"}}
+{"id":"query_reports","prompt":"查询最近失败的测试报告","expectedTools":["query_reports"],"successCriteria":{"textContains":"报告"}}
+{"id":"list_memory","prompt":"我有哪些长期记忆","expectedTools":["list_memory"],"successCriteria":{}}
+{"id":"list_templates","prompt":"有哪些用例模板","expectedTools":["list_templates"],"successCriteria":{}}
+{"id":"write_project_confirm","prompt":"创建一个新项目，名称为 Eval测试项目（需要用户确认）","expectedTools":["create_project"],"successCriteria":{"stopReason":"awaiting_confirmation"}}
+{"id":"gen_cases_from_doc","setupUpload":{"fileName":"eval-requirement.md","content":"# 用户登录接口需求\n\nPOST /api/login，参数 username/password，成功返回 token，失败返回错误码，参数缺失返回 400。"},"prompt":"根据会话里上传的需求文档生成测试用例：先解析文档，再调用 generate_cases 生成草稿并展示，不要保存","expectedTools":["parse_document","generate_cases"],"successCriteria":{"textContains":"用例"}}
+{"id":"run_api_confirm","prompt":"执行这个接口测试：GET https://httpbin.org/status/200，断言状态码为 200（执行前需要确认）","expectedTools":["run_api_test"],"successCriteria":{"stopReason":"awaiting_confirmation"}}

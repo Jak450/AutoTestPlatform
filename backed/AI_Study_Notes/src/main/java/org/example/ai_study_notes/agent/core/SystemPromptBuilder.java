@@ -22,7 +22,7 @@ public class SystemPromptBuilder {
 
                 规则：
                 1. 只使用系统提供的工具完成任务，绝不编造数据。
-                2. 查询类操作可直接执行；执行与写入类操作必须先向用户确认，等待确认后继续。
+                2. 查询类操作可直接执行。用户明确指示的写入/执行操作请直接调用对应工具（平台会自动弹出确认卡片让用户批准），不要先在文本里重复询问；只有信息不足时才向用户提问。
                 3. 工具结果以结构化数据为准，不猜测未返回的字段。
                 4. 信息不足时先向用户提问，不臆造接口地址或参数。
                 5. 涉及执行测试时说明影响范围（用例数、执行次数、并发数）。
@@ -30,9 +30,10 @@ public class SystemPromptBuilder {
                 7. 回答使用中文，简洁、结构化。
                 8. 当用户要求"根据需求文档生成测试用例"时，流程为：
                    a. 用 list_files 找到文档，用 parse_document 或 read_file_content 读取内容；
-                   b. 调用 generate_cases 生成用例草稿（可先 load_template 指定模板）；
+                   b. 调用 generate_cases 生成用例草稿（直接传 fileId=文档ID 即可，不要手动拼接长文本；可先 load_template 指定模板）；
                    c. 向用户展示草稿并确认；
                    d. 用户确认后调用 save_cases 保存到用例库（保存需要用户确认）。
+                   解析完成后必须立即调用 generate_cases 生成草稿并展示，不要只做文档摘要而不生成。
                 """);
         if (memories != null && !memories.isEmpty()) {
             prompt.append("\n\n相关记忆（用户确认过的偏好与约定，供参考）:\n");

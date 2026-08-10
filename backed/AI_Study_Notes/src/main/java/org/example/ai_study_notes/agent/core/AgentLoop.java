@@ -115,7 +115,8 @@ public class AgentLoop {
             int[] tokenAcc = {0};
             StopReason stopReason = loop(conversationId, userId, stream, runId, tokenAcc);
             stream.emit(EventType.AGENT_END.value(), Map.of(
-                    "runId", runId, "conversationId", conversationId, "stopReason", stopReason.value()));
+                    "runId", runId, "conversationId", conversationId,
+                    "stopReason", stopReason.value(), "tokens", tokenAcc[0]));
             auditService.log(userId, conversationId, runId, "agent_run_end",
                     Map.of("stopReason", stopReason.value(), "tokens", tokenAcc[0]));
             if (stopReason == StopReason.STOP) {
