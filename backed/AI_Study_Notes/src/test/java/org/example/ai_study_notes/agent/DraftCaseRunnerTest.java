@@ -35,9 +35,9 @@ class DraftCaseRunnerTest {
 
         Map<String, Object> summary = (Map<String, Object>) report.get("summary");
         assertEquals(1, summary.get("total"));
-        assertEquals(1, summary.get("executable"));
-        assertEquals(1, summary.get("assertPassed"));
-        assertEquals(1, summary.get("usable"));
+        assertEquals(1, summary.get("executableRuns"));
+        assertEquals(1, summary.get("assertPassedRuns"));
+        assertEquals(1, summary.get("usableCases"));
     }
 
     @Test
@@ -50,8 +50,9 @@ class DraftCaseRunnerTest {
                 Map.of("name", "超时", "url", "http://x/api", "method", "GET")));
 
         Map<String, Object> summary = (Map<String, Object>) report.get("summary");
-        assertEquals(1, summary.get("notExecutable"));
+        assertEquals(1, summary.get("notExecutableRuns"));
         List<Map<String, Object>> details = (List<Map<String, Object>>) report.get("details");
-        assertEquals("exec_error", details.get(0).get("category"));
+        List<Map<String, Object>> runs = (List<Map<String, Object>>) details.get(0).get("runs");
+        assertEquals("exec_error", runs.get(0).get("category"));
     }
 }

@@ -31,8 +31,8 @@ public class SystemPromptBuilder {
                 8. 当用户要求"根据需求文档生成测试用例"时，流程为：
                    a. 用 list_files 找到文档，用 parse_document 或 read_file_content 读取内容；
                    b. 调用 generate_cases 生成用例草稿（直接传 fileId=文档ID 即可，不要手动拼接长文本；可先 load_template 指定模板）；
-                   c. 向用户展示草稿并确认；
-                   d. 用户确认后调用 save_cases 保存到用例库（保存需要用户确认）。
+                   c. 生成后用 trial_run_cases 试跑草稿（试跑需要用户确认），把可用性报告展示给用户；
+                   d. 用户确认后再调用 save_cases 保存到用例库（保存也需要用户确认）。
                    解析完成后必须立即调用 generate_cases 生成草稿并展示，不要只做文档摘要而不生成。
                 """);
         if (memories != null && !memories.isEmpty()) {

@@ -1,17 +1,14 @@
-# Agent 评测报告
+# Agent 评测报告（多轮）
 
-- 生成时间: 2026/8/10 15:52:01
-- 通过率: 8/8 (100%)
-- 平均轮数: 2.3
-- token 总量: 81170，平均 10146/任务
+- 生成时间: 2026/8/10 16:09:31
+- 任务数: 1，总轮次: 2（每任务 2 轮）
+- 通过率: 1/2 (50%)
+- 平均轮数: 2.0
+- token 总量: undefined，平均 9732/轮
 
-| 任务 | 结果 | 工具调用 | stopReason | 轮数 | tokens |
+| 任务 | 通过率 | 工具调用（最近一轮） | stopReason（最近一轮） | 平均轮数 | 平均tokens |
 |---|---|---|---|---|---|
-| query_projects | ✅ | list_projects | stop | 2 | 8291 |
-| query_use_cases | ✅ | list_use_cases | stop | 2 | 8367 |
-| query_reports | ✅ | query_reports | stop | 2 | 9187 |
-| list_memory | ✅ | list_memory | stop | 2 | 8248 |
-| list_templates | ✅ | list_templates | stop | 2 | 8284 |
-| write_project_confirm | ✅ | create_project | awaiting_confirmation | 1 | 4104 |
-| gen_cases_from_doc | ✅ | list_files, list_templates, parse_document, read_file_content, generate_cases, parse_document, read_file_content | stop | 6 | 30412 |
-| run_api_confirm | ✅ | run_api_test | awaiting_confirmation | 1 | 4277 |
+| trial_run_generated | 1/2 | list_files, read_file_content, generate_cases, trial_run_cases | awaiting_confirmation | 4 | 19464 |
+
+**trial_run_generated** 失败明细（通过 1/2）：
+- 第 1 轮: 工具=[list_files, generate_cases, read_file_content, parse_document] stop=stop
