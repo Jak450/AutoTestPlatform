@@ -14,7 +14,6 @@ import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
 import org.example.ai_study_notes.agent.memory.retrieval.MemoryRetriever;
 import org.example.ai_study_notes.agent.memory.distill.MemoryDistiller;
-import org.example.ai_study_notes.agent.memory.MemoryExtractor;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
 import org.example.ai_study_notes.agent.session.MessageService;
@@ -55,7 +54,6 @@ public class AgentLoop {
     private final MemoryRetriever memoryRetriever;
     private final MemoryDistiller memoryDistiller;
     private final ContextCompactor contextCompactor;
-    private final MemoryExtractor memoryExtractor;
     private final SkillService skillService;
     private final AuditService auditService;
     private final RunRegistry runRegistry;
@@ -75,7 +73,6 @@ public class AgentLoop {
                      MemoryRetriever memoryRetriever,
                      MemoryDistiller memoryDistiller,
                      ContextCompactor contextCompactor,
-                     MemoryExtractor memoryExtractor,
                      SkillService skillService,
                      AuditService auditService,
                      RunRegistry runRegistry,
@@ -94,7 +91,6 @@ public class AgentLoop {
         this.memoryRetriever = memoryRetriever;
         this.memoryDistiller = memoryDistiller;
         this.contextCompactor = contextCompactor;
-        this.memoryExtractor = memoryExtractor;
         this.skillService = skillService;
         this.auditService = auditService;
         this.runRegistry = runRegistry;
@@ -129,7 +125,6 @@ public class AgentLoop {
             auditService.log(userId, conversationId, runId, "agent_run_end",
                     Map.of("stopReason", stopReason.value(), "tokens", tokenAcc[0]));
             if (stopReason == StopReason.STOP) {
-                memoryExtractor.extractIfNeeded(conversationId, userId, historyTail(conversationId));
                 memoryDistiller.extractIfNeeded(conversationId, userId);
             }
         } catch (Exception e) {
@@ -406,21 +401,6 @@ public class AgentLoop {
             }
         }
         return query.toString();
-    }
-
-    private String historyTail(Long conversationId) {
-        List<AgentMessage> all = messageService.list(conversationId);
-        StringBuilder tail = new StringBuilder();
-        int added = 0;
-        for (int i = all.size() - 1; i >= 0 && added < 6; i--) {
-            AgentMessage message = all.get(i);
-            if (message.getContent() == null || message.getContent().isBlank()) {
-                continue;
-            }
-            tail.insert(0, "[" + message.getRole() + "] " + message.getContent() + "\n");
-            added++;
-        }
-        return tail.toString();
     }
 
     private Map<String, Object> toolMeta(String toolCallId, String toolName, Map<String, Object> args,

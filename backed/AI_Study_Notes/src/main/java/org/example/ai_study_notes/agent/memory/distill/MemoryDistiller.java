@@ -7,6 +7,8 @@ import org.example.ai_study_notes.agent.config.AgentProperties;
 import org.example.ai_study_notes.agent.core.AgentAiClient;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
+import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
+import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.example.ai_study_notes.agent.memory.episode.EpisodeRecorder;
 import org.example.ai_study_notes.agent.memory.experience.MemoryExperience;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
@@ -31,16 +33,22 @@ public class MemoryDistiller {
     private static final String PROMPT = """
             你是记忆提炼器。从对话历史中提炼结构化记忆，只输出 JSON：
             {"facts":[{"entity_id":"...","attribute":"...","value":"...","confidence":0.9}],
-             "experiences":[{"task_type":"...","rule":"...","confidence":0.8}]}
+             "experiences":[{"task_type":"...","rule":"...","confidence":0.8}],
+             "preferences":[{"key":"snake_case","content":"一句话偏好"}],
+             "knowledge":[{"title":"...","category":"经验教训|测试理论|项目规范","content":"2-4 句结论"}]}
             规则：
             - facts 是用户明确陈述的实体事实（价格/环境/命名/约定等），宁缺毋滥，不虚构；
             - experiences 是绑定任务类型的可复用测试经验（如 test_case_extraction / api_test / ui_test）；
-            - 没有可提炼内容输出 {"facts":[],"experiences":[]}，不要输出其他文字。
+            - preferences 是用户明确表达、跨会话有用的偏好/约定；
+            - knowledge 是对话中沉淀的可复用测试经验/踩坑结论；
+            - 没有可提炼内容对应数组给 []，不要输出其他文字。
             """;
 
     private final AgentAiClient aiClient;
     private final FactMemoryService factService;
     private final ExperienceMemoryService experienceService;
+    private final MemoryService memoryService;
+    private final KnowledgeService knowledgeService;
     private final MemoryIndexer indexer;
     private final EpisodeRecorder episodeRecorder;
     private final MessageService messageService;
@@ -51,10 +59,13 @@ public class MemoryDistiller {
     public MemoryDistiller(AgentAiClient aiClient, FactMemoryService factService,
                            ExperienceMemoryService experienceService, MemoryIndexer indexer,
                            EpisodeRecorder episodeRecorder, MessageService messageService,
-                           AgentProperties properties) {
+                           AgentProperties properties, MemoryService memoryService,
+                           KnowledgeService knowledgeService) {
         this.aiClient = aiClient;
         this.factService = factService;
         this.experienceService = experienceService;
+        this.memoryService = memoryService;
+        this.knowledgeService = knowledgeService;
         this.indexer = indexer;
         this.episodeRecorder = episodeRecorder;
         this.messageService = messageService;
@@ -89,6 +100,26 @@ public class MemoryDistiller {
                         str(e.get("task_type")), str(e.get("rule")),
                         "会话#" + conversationId, dbl(e.get("confidence")));
                 indexer.indexExperience(exp);
+            }
+            for (Object item : list(result, "preferences")) {
+                Map<String, Object> p = cast(item);
+                String key = str(p.get("key"));
+                String content = str(p.get("content"));
+                if (key.isBlank() || content.isBlank()) {
+                    continue;
+                }
+                memoryService.save(userId, key, content, List.of("auto"), false, conversationId);
+            }
+            for (Object item : list(result, "knowledge")) {
+                Map<String, Object> k = cast(item);
+                String title = str(k.get("title"));
+                String content = str(k.get("content"));
+                String category = str(k.get("category"));
+                if (title.isBlank() || content.isBlank()) {
+                    continue;
+                }
+                knowledgeService.saveCandidate(userId, title, content,
+                        category.isBlank() ? "经验教训" : category, List.of("auto"));
             }
             extracted.add(conversationId);
             log.info("会话 {} 记忆提炼完成", conversationId);
