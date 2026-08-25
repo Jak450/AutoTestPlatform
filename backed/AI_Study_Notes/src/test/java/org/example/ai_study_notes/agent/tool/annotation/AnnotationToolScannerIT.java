@@ -36,4 +36,12 @@ class AnnotationToolScannerIT {
                 false);
         assertEquals(ToolResultMeta.Status.SUCCESS, result.getStatus());
     }
+
+    @Test
+    void legacyMemoryToolsNotRegistered() {
+        org.junit.jupiter.api.Assertions.assertNull(registry.get("save_memory"));
+        org.junit.jupiter.api.Assertions.assertNull(registry.get("forget_memory"));
+        org.junit.jupiter.api.Assertions.assertNull(registry.get("list_memory"));
+        org.junit.jupiter.api.Assertions.assertNull(registry.get("save_knowledge"));
+    }
 }
