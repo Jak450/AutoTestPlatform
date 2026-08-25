@@ -1859,3 +1859,10 @@ git commit -m "chore(memory): 记忆层地基全量验证"
 - **Spec 覆盖**：设计文档 §6（存储）、§8（检索）、§9（评测）、§8.5（性能预算中的注入预算）由 Task 1-8 覆盖；§7 写入管道、§10 更新遗忘、§14 安全合规由后续子计划覆盖。
 - **占位符**：无 TBD/TODO；所有代码步骤给出完整实现。
 - **类型一致性**：`MemoryRetriever.RankedItem(type,id,content,score)` 在 Controller、评测脚本、Retriever 间一致；`FactMemoryService.upsert` 签名在测试与实现一致；`QdrantVectorStore.Hit(id,score,payload)` 在 Task 4/6 一致。
+
+## 执行记录（2026-08-25，与计划的偏差）
+
+- 项目 Mapper 约定为 `@Repository` + `@MapperScan(annotationClass = Repository.class)`，新 Mapper 均改用 `@Repository`。
+- surefire 的 `excludedGroups` 改为属性驱动（`<surefire.excludedGroups>`），运行集成测试用 `-Dsurefire.excludedGroups=`（空值需带引号），`-Dgroups=integration` 组合会导致 0 测试。
+- qdrant-client 1.13.0 将 grpc 依赖声明为 runtime，pom 需显式补充 `grpc-netty-shaded / grpc-protobuf / grpc-stub` 三个 compile 依赖。
+- Qdrant Java 客户端 API 与计划示例略有出入：payload 值类型为 `JsonWithInt.Value`（用 `ValueFactory` 构造），`PointIdFactory.id()` 仅接受 long/UUID——实现改用 `UUID.nameUUIDFromBytes(业务id)` 作为 point id，并把业务 id 存入 payload `id` 字段，检索结果从 payload 还原。

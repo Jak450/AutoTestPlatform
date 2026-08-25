@@ -17,7 +17,7 @@
 **Files:**
 - Create: `backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/tool/annotation/AgentTool.java`
 - Create: `backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/tool/annotation/ToolParam.java`
-- Modify: `backed/AI_Study_Notes/pom.xml`（`<build><plugins>` 内追加 maven-compiler-plugin）
+- Modify: 无（pom 已含 `<parameters>true</parameters>`，maven-compiler-plugin 3.10.1）
 
 - [ ] **Step 1: 创建注解**
 
@@ -81,22 +81,7 @@ public @interface ToolParam {
 }
 ```
 
-- [ ] **Step 2: pom 开启参数名保留**
-
-在 `backed/AI_Study_Notes/pom.xml` 的 `<build><plugins>` 内追加（现有插件之前）：
-
-```xml
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.13.0</version>
-            <configuration>
-                <parameters>true</parameters>
-            </configuration>
-        </plugin>
-```
-
-- [ ] **Step 3: 验证编译通过**
+- [ ] **Step 2: 验证编译通过（含 -parameters 已生效）**
 
 ```powershell
 & "D:\wangzhikang\IntelliJ IDEA 2024.3\plugins\maven\lib\maven3\bin\mvn.cmd" -f backed\AI_Study_Notes\pom.xml -q test-compile
@@ -104,10 +89,10 @@ public @interface ToolParam {
 
 Expected: 退出码 0，无输出。
 
-- [ ] **Step 4: 提交**
+- [ ] **Step 3: 提交**
 
 ```bash
-git add backed/AI_Study_Notes/pom.xml backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/tool/annotation
+git add backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/tool/annotation
 git commit -m "feat(tool): @AgentTool/@ToolParam 注解定义与 -parameters 编译参数"
 ```
 
@@ -483,11 +468,11 @@ class AnnotationToolScannerIT {
 
     @Test
     void annotatedToolRegisteredAndExecutable() {
-        ToolDefinition definition = registry.get("get_project_by_id");
-        assertNotNull(definition, "get_project_by_id 应由 @AgentTool 注册");
+        ToolDefinition definition = registry.get("list_all_projects");
+        assertNotNull(definition, "list_all_projects 应由 @AgentTool 注册");
 
-        ToolResult result = executionService.execute("get_project_by_id",
-                Map.of("projectId", 1L),
+        ToolResult result = executionService.execute("list_all_projects",
+                Map.of(),
                 ToolContext.builder().userId(1L).conversationId(1L).build(),
                 false);
         assertEquals(ToolResultMeta.Status.SUCCESS, result.getStatus());
@@ -501,7 +486,7 @@ class AnnotationToolScannerIT {
 & "D:\wangzhikang\IntelliJ IDEA 2024.3\plugins\maven\lib\maven3\bin\mvn.cmd" -f backed\AI_Study_Notes\pom.xml test -Dtest=AnnotationToolScannerIT -DexcludedGroups=
 ```
 
-Expected: 失败（`get_project_by_id` 未注册，断言 `assertNotNull` 抛异常）。
+Expected: 失败（`list_all_projects` 未注册，断言 `assertNotNull` 抛异常）。
 
 - [ ] **Step 3: 实现扫描器**
 
@@ -577,7 +562,7 @@ public class AnnotationToolScanner implements ApplicationRunner {
 & "D:\wangzhikang\IntelliJ IDEA 2024.3\plugins\maven\lib\maven3\bin\mvn.cmd" -f backed\AI_Study_Notes\pom.xml test -Dtest=AnnotationToolScannerIT -DexcludedGroups=
 ```
 
-Expected: 仍失败——`get_project_by_id` 工具本身还不存在（Task 5 创建示例工具后通过）。
+Expected: 仍失败——`list_all_projects` 工具本身还不存在（Task 5 创建示例工具后通过）。
 
 - [ ] **Step 5: 提交**
 
@@ -603,9 +588,10 @@ package org.example.ai_study_notes.agent.tool.tools.annotated;
 import org.example.ai_study_notes.Pojo.vo.ProjectVO;
 import org.example.ai_study_notes.agent.contract.ToolPermission;
 import org.example.ai_study_notes.agent.tool.annotation.AgentTool;
-import org.example.ai_study_notes.agent.tool.annotation.ToolParam;
 import org.example.ai_study_notes.service.ProjectService;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * 注解化工具示例：直接复用现有 ProjectService 方法，无需手写 ToolExecutor 类。
@@ -619,17 +605,16 @@ public class ProjectToolGroup {
         this.projectService = projectService;
     }
 
-    @AgentTool(name = "get_project_by_id", label = "查询项目详情",
-               description = "按 ID 查询 API 测试项目详情",
+    @AgentTool(name = "list_all_projects", label = "查询全部项目",
+               description = "查询当前平台所有 API 测试项目",
                permission = ToolPermission.READ, category = "查询")
-    public ProjectVO getProjectById(
-            @ToolParam(name = "projectId", description = "项目 ID") Long projectId) {
-        return projectService.getById(projectId);
+    public List<ProjectVO> listAllProjects() {
+        return projectService.getProject();
     }
 }
 ```
 
-注意：若 `ProjectService` 无 `getById` 方法（编译报错时），改为调用已确认存在的 `projectService.getProject()` 并去掉参数。
+注意：`ProjectService` 接口仅有 `getProject/addProject/updateProject/deleteProject`，故示例复用无参的 `getProject()`；工具名 `list_all_projects` 与现有 `list_projects` 不冲突。
 
 - [ ] **Step 2: 运行集成测试确认通过**
 
@@ -655,13 +640,13 @@ cd backed\AI_Study_Notes
 java -jar target\AI_Study_Notes-0.0.1-SNAPSHOT.jar
 ```
 
-Expected: 日志出现 `注解工具注册成功: get_project_by_id`，且原有 41 个工具照常注册（共 42 个）。
+Expected: 日志出现 `注解工具注册成功: list_all_projects`，且原有 41 个工具照常注册（共 42 个）。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add backed/AI_Study_Notes/src/main/java/org/example/ai_study_notes/agent/tool/tools/annotated
-git commit -m "feat(tool): 示例注解工具 get_project_by_id 复用 ProjectService"
+git commit -m "feat(tool): 示例注解工具 list_all_projects 复用 ProjectService"
 ```
 
 ---
