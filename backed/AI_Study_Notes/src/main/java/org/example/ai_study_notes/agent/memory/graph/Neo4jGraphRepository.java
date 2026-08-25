@@ -100,6 +100,79 @@ public class Neo4jGraphRepository {
         }
     }
 
+    public List<RelationHit> listUnconfirmedRelations(Long workspaceId, int limit) {
+        try (var session = driver.session()) {
+            var result = session.run("""
+                    MATCH (a:Entity {workspaceId: $workspaceId})-[r]->(b:Entity {workspaceId: $workspaceId})
+                    WHERE r.confirmed = false AND r.validTo IS NULL
+                    RETURN a.entityId AS subjectId, a.name AS subjectName,
+                           b.entityId AS objectId, b.name AS objectName,
+                           type(r) AS predicate, r.context AS context
+                    LIMIT $limit
+                    """, Map.of("workspaceId", workspaceId, "limit", limit));
+            return result.list(record -> new RelationHit(
+                    record.get("subjectId").asString(),
+                    record.get("subjectName").asString(),
+                    record.get("objectId").asString(),
+                    record.get("objectName").asString(),
+                    RelationType.valueOf(record.get("predicate").asString()),
+                    record.get("context").isNull() ? "" : record.get("context").asString()));
+        }
+    }
+
+    public void deleteRelation(String subjectId, RelationType predicate, String objectId,
+                               Long workspaceId) {
+        try (var session = driver.session()) {
+            session.run("""
+                    MATCH (a:Entity {entityId: $subjectId, workspaceId: $workspaceId})
+                          -[r:%s]->(b:Entity {entityId: $objectId, workspaceId: $workspaceId})
+                    DELETE r
+                    """.formatted(predicate.name()), Map.of(
+                    "subjectId", subjectId, "objectId", objectId, "workspaceId", workspaceId));
+        }
+    }
+
+    public void updateRelationContext(String subjectId, RelationType predicate, String objectId,
+                                     String context, Long workspaceId) {
+        try (var session = driver.session()) {
+            session.run("""
+                    MATCH (a:Entity {entityId: $subjectId, workspaceId: $workspaceId})
+                          -[r:%s]->(b:Entity {entityId: $objectId, workspaceId: $workspaceId})
+                    SET r.context = $context, r.confirmed = true
+                    """.formatted(predicate.name()), Map.of(
+                    "subjectId", subjectId, "objectId", objectId,
+                    "workspaceId", workspaceId, "context", context));
+        }
+    }
+
+    public void decayUnconfirmedRelations(int ageDays, double decayFactor, double archiveThreshold) {
+        try (var session = driver.session()) {
+            session.run("""
+                    MATCH ()-[r]->()
+                    WHERE r.confirmed = false AND r.validTo IS NULL
+                      AND r.createdAt < datetime() - duration({days: $ageDays})
+                    SET r.weight = coalesce(r.weight, 1.0) * $decayFactor
+                    """, Map.of("ageDays", ageDays, "decayFactor", decayFactor));
+            session.run("""
+                    MATCH ()-[r]->()
+                    WHERE r.confirmed = false AND r.validTo IS NULL
+                      AND coalesce(r.weight, 1.0) < $threshold
+                    SET r.validTo = datetime()
+                    """, Map.of("threshold", archiveThreshold));
+        }
+    }
+
+    public void confirmUnconfirmedRelationsOlderThan(int hours) {
+        try (var session = driver.session()) {
+            session.run("""
+                    MATCH ()-[r]->()
+                    WHERE r.confirmed = false AND r.validTo IS NULL
+                      AND r.createdAt < datetime() - duration({hours: $hours})
+                    SET r.confirmed = true
+                    """, Map.of("hours", hours));
+        }
+    }
+
     public List<RelationHit> expand(String entityId, Long workspaceId, int depth) {
         List<RelationHit> hits = expandOnce(entityId, workspaceId);
         if (depth >= 2) {

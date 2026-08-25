@@ -9,6 +9,7 @@ import org.example.ai_study_notes.agent.memory.experience.MemoryExperience;
 import org.example.ai_study_notes.agent.memory.experience.MemoryExperienceMapper;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFactMapper;
+import org.example.ai_study_notes.agent.memory.graph.Neo4jGraphRepository;
 import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -27,17 +28,20 @@ public class MemoryMaintenanceJob {
     private final MemoryExperienceMapper experienceMapper;
     private final MemoryFactMapper factMapper;
     private final QdrantVectorStore vectorStore;
+    private final Neo4jGraphRepository graphRepository;
 
     public MemoryMaintenanceJob(AgentProperties properties,
                                 MemoryEpisodeMapper episodeMapper,
                                 MemoryExperienceMapper experienceMapper,
                                 MemoryFactMapper factMapper,
-                                QdrantVectorStore vectorStore) {
+                                QdrantVectorStore vectorStore,
+                                Neo4jGraphRepository graphRepository) {
         this.properties = properties;
         this.episodeMapper = episodeMapper;
         this.experienceMapper = experienceMapper;
         this.factMapper = factMapper;
         this.vectorStore = vectorStore;
+        this.graphRepository = graphRepository;
     }
 
     @Scheduled(fixedDelayString = "${agent.maintenance.interval-ms:3600000}")
@@ -49,7 +53,9 @@ public class MemoryMaintenanceJob {
             int archived = archiveEpisodes();
             int expired = expireCandidates();
             int factVectors = archiveArchivedFactVectors();
-            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条，清理归档事实向量 {} 条",
+            graphRepository.decayUnconfirmedRelations(30, 0.9, 0.2);
+            graphRepository.confirmUnconfirmedRelationsOlderThan(24);
+            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条，清理归档事实向量 {} 条，关系衰减/超时确认已执行",
                     archived, expired, factVectors);
         } catch (Exception e) {
             log.warn("记忆维护失败: {}", e.getMessage());
