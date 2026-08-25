@@ -65,6 +65,7 @@ public class AgentProperties {
         private String host = "127.0.0.1";
         private int port = 6334;
         private String apiKey = "";
+        private String collectionPrefix = "";
     }
 
     @Data

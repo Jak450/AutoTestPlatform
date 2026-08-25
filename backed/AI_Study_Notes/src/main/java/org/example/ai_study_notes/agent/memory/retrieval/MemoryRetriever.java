@@ -61,10 +61,12 @@ public class MemoryRetriever {
             log.warn("Embedding 不可用，降级为纯关键词检索: {}", e.getMessage());
         }
         if (queryVec != null) {
-            addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_FACTS, queryVec,
+            addVectorRoute(rankedIds, byId,
+                    vectorStore.collectionName(QdrantVectorStore.COLLECTION_FACTS), queryVec,
                     workspaceId, null, "fact", topK * 2,
                     hit -> "事实: " + hit.payload().getOrDefault("text", ""));
-            addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_EXPERIENCES, queryVec,
+            addVectorRoute(rankedIds, byId,
+                    vectorStore.collectionName(QdrantVectorStore.COLLECTION_EXPERIENCES), queryVec,
                     workspaceId, true, "experience", topK * 2,
                     hit -> "经验: " + hit.payload().getOrDefault("text", ""));
         }

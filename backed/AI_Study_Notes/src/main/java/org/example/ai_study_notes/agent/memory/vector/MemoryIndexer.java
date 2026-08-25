@@ -29,7 +29,8 @@ public class MemoryIndexer {
         try {
             List<Float> vector = embeddingClient.embed(
                     fact.getEntityId() + " " + fact.getAttribute() + " " + fact.getFactValue());
-            vectorStore.upsert(QdrantVectorStore.COLLECTION_FACTS, "fact:" + fact.getId(), vector,
+            vectorStore.upsert(vectorStore.collectionName(QdrantVectorStore.COLLECTION_FACTS),
+                    "fact:" + fact.getId(), vector,
                     Map.of("workspace_id", String.valueOf(fact.getWorkspaceId()),
                             "text", fact.getEntityId() + "." + fact.getAttribute() + " = " + fact.getFactValue(),
                             "confirmed", 1,
@@ -42,7 +43,8 @@ public class MemoryIndexer {
     public void indexExperience(MemoryExperience exp) {
         try {
             List<Float> vector = embeddingClient.embed(exp.getRuleText());
-            vectorStore.upsert(QdrantVectorStore.COLLECTION_EXPERIENCES, "experience:" + exp.getId(), vector,
+            vectorStore.upsert(vectorStore.collectionName(QdrantVectorStore.COLLECTION_EXPERIENCES),
+                    "experience:" + exp.getId(), vector,
                     Map.of("workspace_id", String.valueOf(exp.getWorkspaceId()),
                             "text", exp.getRuleText(),
                             "confirmed", exp.getConfirmed(),

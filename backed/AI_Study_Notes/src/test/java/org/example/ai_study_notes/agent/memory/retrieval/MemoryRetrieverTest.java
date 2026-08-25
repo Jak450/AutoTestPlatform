@@ -55,6 +55,7 @@ class MemoryRetrieverTest {
                         java.util.Map.of("entity_id", "shoe"))));
         when(store.search(eq("experiences"), any(), eq("1"), eq(true), anyInt()))
                 .thenReturn(List.of());
+        when(store.collectionName(anyString())).thenAnswer(inv -> inv.getArgument(0));
         FactMemoryService factService = mock(FactMemoryService.class);
         when(factService.searchKeyword(eq(1L), anyString())).thenReturn(List.of());
         ExperienceMemoryService experienceService = mock(ExperienceMemoryService.class);

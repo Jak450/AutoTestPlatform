@@ -25,26 +25,27 @@ class QdrantVectorStoreIT {
         AgentProperties props = new AgentProperties();
         props.getQdrant().setHost("127.0.0.1");
         props.getQdrant().setPort(6334);
+        props.getQdrant().setCollectionPrefix("it_");
         props.getEmbedding().setDimensions(4);
         store = new QdrantVectorStore(props);
     }
 
     @Test
     void upsertAndSearch() {
-        store.upsert("facts", "f1", List.of(1f, 0f, 0f, 0f), Map.of("workspace_id", "1", "confirmed", 1));
-        store.upsert("facts", "f2", List.of(0f, 1f, 0f, 0f), Map.of("workspace_id", "1", "confirmed", 1));
-        List<QdrantVectorStore.Hit> hits = store.search("facts", List.of(0.9f, 0.1f, 0f, 0f), "1", null, 2);
+        store.upsert(store.collectionName("facts"), "f1", List.of(1f, 0f, 0f, 0f), Map.of("workspace_id", "1", "confirmed", 1));
+        store.upsert(store.collectionName("facts"), "f2", List.of(0f, 1f, 0f, 0f), Map.of("workspace_id", "1", "confirmed", 1));
+        List<QdrantVectorStore.Hit> hits = store.search(store.collectionName("facts"), List.of(0.9f, 0.1f, 0f, 0f), "1", null, 2);
         assertFalse(hits.isEmpty());
     }
 
     @Test
     void confirmedFilterMatchesIntegerPayload() {
-        store.upsert("experiences", "e1", List.of(1f, 0f, 0f, 0f),
+        store.upsert(store.collectionName("experiences"), "e1", List.of(1f, 0f, 0f, 0f),
                 Map.of("workspace_id", "1", "confirmed", 1));
-        store.upsert("experiences", "e2", List.of(0f, 1f, 0f, 0f),
+        store.upsert(store.collectionName("experiences"), "e2", List.of(0f, 1f, 0f, 0f),
                 Map.of("workspace_id", "1", "confirmed", 0));
         List<QdrantVectorStore.Hit> hits =
-                store.search("experiences", List.of(0.9f, 0.1f, 0f, 0f), "1", true, 2);
+                store.search(store.collectionName("experiences"), List.of(0.9f, 0.1f, 0f, 0f), "1", true, 2);
         assertEquals(1, hits.size());
         assertEquals("e1", hits.get(0).id());
     }

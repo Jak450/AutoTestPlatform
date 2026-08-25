@@ -59,17 +59,23 @@ public class QdrantVectorStore {
         int dim = properties.getEmbedding().getDimensions();
         for (String name : List.of(COLLECTION_FACTS, COLLECTION_EXPERIENCES, COLLECTION_KNOWLEDGE)) {
             try {
-                boolean exists = client.collectionExistsAsync(name).get(5, TimeUnit.SECONDS);
+                String collection = collectionName(name);
+                boolean exists = client.collectionExistsAsync(collection).get(5, TimeUnit.SECONDS);
                 if (!exists) {
-                    client.createCollectionAsync(name, VectorParams.newBuilder()
+                    client.createCollectionAsync(collection, VectorParams.newBuilder()
                                     .setSize(dim).setDistance(Distance.Cosine).build())
                             .get(30, TimeUnit.SECONDS);
-                    log.info("Qdrant 集合已创建: {}", name);
+                    log.info("Qdrant 集合已创建: {}", collection);
                 }
             } catch (Exception e) {
                 log.warn("Qdrant 初始化集合失败 {}: {}", name, e.getMessage());
             }
         }
+    }
+
+    public String collectionName(String name) {
+        String prefix = properties.getQdrant().getCollectionPrefix();
+        return prefix == null || prefix.isBlank() ? name : prefix + name;
     }
 
     public void upsert(String collection, String pointId, List<Float> vector, Map<String, Object> payload) {

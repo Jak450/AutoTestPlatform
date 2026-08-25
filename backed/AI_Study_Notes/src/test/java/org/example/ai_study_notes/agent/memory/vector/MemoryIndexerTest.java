@@ -21,6 +21,7 @@ class MemoryIndexerTest {
         EmbeddingClient embedding = mock(EmbeddingClient.class);
         when(embedding.embed(any())).thenReturn(List.of(1f, 0f, 0f));
         QdrantVectorStore store = mock(QdrantVectorStore.class);
+        when(store.collectionName(any())).thenAnswer(inv -> inv.getArgument(0));
         MemoryIndexer indexer = new MemoryIndexer(embedding, store);
 
         MemoryFact fact = MemoryFact.builder().id(1L).workspaceId(1L)
@@ -36,6 +37,7 @@ class MemoryIndexerTest {
         EmbeddingClient embedding = mock(EmbeddingClient.class);
         when(embedding.embed(any())).thenReturn(List.of(1f, 0f, 0f));
         QdrantVectorStore store = mock(QdrantVectorStore.class);
+        when(store.collectionName(any())).thenAnswer(inv -> inv.getArgument(0));
         MemoryIndexer indexer = new MemoryIndexer(embedding, store);
 
         MemoryExperience exp = MemoryExperience.builder().id(2L).workspaceId(1L)

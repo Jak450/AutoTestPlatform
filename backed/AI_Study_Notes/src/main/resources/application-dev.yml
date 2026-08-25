@@ -74,6 +74,7 @@ agent:
     host: ${QDRANT_HOST:127.0.0.1}
     port: ${QDRANT_PORT:6334}
     api-key: ${QDRANT_API_KEY:}
+    collection-prefix: ${QDRANT_COLLECTION_PREFIX:}
   distill:
     enabled: ${DISTILL_ENABLED:true}
     min-characters: 60
