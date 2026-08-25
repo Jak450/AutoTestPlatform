@@ -19,5 +19,8 @@ logs/
 # Agent 模块本地数据（附件、工具输出等）
 agent-data/
 
+# Neo4j 本地数据卷（Docker 挂载，不入库）
+deploy/neo4j-data/
+
 # 视觉辅助/头脑风暴临时文件
 .superpowers/

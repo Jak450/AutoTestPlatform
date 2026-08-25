@@ -771,3 +771,11 @@ git commit -m "chore(graph): 关系图全量验证"
 - **占位符**：无 TBD/TODO；`RelationHit` 从 Task 2 即携带 `subjectName`，`format` 在 Task 4 一次实现正确，无遗留占位。
 - **类型一致性**：`RelationHit(subjectEntityId, subjectName, objectEntityId, objectName, predicate, context)` 在 Task 2/3/4 使用一致；`RelationType` 受控词表在 Extract/Repository/Test 间一致；`MemoryInjection` 新增 `relations` 字段在 Retriever/AgentLoop/测试间一致。
 - **分层/DRY**：Repository 只管 Cypher；Extractor 只编排；Retriever 只组装；谓词枚举单一来源；注解工具复用既有注册管线。
+
+## 执行记录（2026-08-25，与计划的偏差）
+
+- Neo4j 驱动 5.x 的 `verifyConnectivity()` 返回 void，连接测试改为执行 `RETURN 1` 验证。
+- `Neo4jGraphRepository` 需作为 Spring bean 供 `RelationExtractor` 注入：新增 `Neo4jConfig`（Driver 懒连接 + 仓储 Bean），否则 `@SpringBootTest` 上下文加载失败。
+- 关系候选（`confirmed=false`）不参与展开，IT 补 `confirmRelation` 方法先确认再断言（符合"确认后参与注入"设计）。
+- 实体命中从"提示词词表"重构为 `findEntityIdsByQuery`（Cypher 反查"查询文本包含哪些已知实体名"），避免"购物"匹配不上"购物模块"。
+- 运行 `AnnotationToolScannerIT` 等集成测试需 Redis 在跑（`list_all_projects` 依赖）。
