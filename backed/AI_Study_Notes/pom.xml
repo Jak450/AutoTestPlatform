@@ -187,6 +187,22 @@
             <artifactId>client</artifactId>
             <version>1.13.0</version>
         </dependency>
+        <!-- qdrant client 将 grpc 依赖声明为 runtime，编译期需显式补充 -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <version>1.65.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>1.65.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <version>1.65.1</version>
+        </dependency>
 
     </dependencies>
 
