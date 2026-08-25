@@ -81,3 +81,8 @@ agent:
     uri: ${NEO4J_URI:bolt://127.0.0.1:7687}
     user: ${NEO4J_USER:neo4j}
     password: ${NEO4J_PASSWORD:autotest123456}
+  maintenance:
+    enabled: ${MAINTENANCE_ENABLED:true}
+    interval-ms: 3600000
+    episode-retention-days: 90
+    candidate-retention-days: 7

@@ -20,6 +20,7 @@ public class AgentProperties {
     private Qdrant qdrant = new Qdrant();
     private Distill distill = new Distill();
     private Neo4j neo4j = new Neo4j();
+    private Maintenance maintenance = new Maintenance();
 
     @Data
     public static class DeepSeek {
@@ -77,5 +78,13 @@ public class AgentProperties {
         private String uri = "bolt://127.0.0.1:7687";
         private String user = "neo4j";
         private String password = "autotest123456";
+    }
+
+    @Data
+    public static class Maintenance {
+        private boolean enabled = true;
+        private long intervalMs = 3_600_000;
+        private int episodeRetentionDays = 90;
+        private int candidateRetentionDays = 7;
     }
 }

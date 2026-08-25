@@ -28,7 +28,10 @@ class AgentPropertiesTest {
                         "agent.distill.min-characters=40",
                         "agent.neo4j.uri=bolt://127.0.0.1:7687",
                         "agent.neo4j.user=neo4j",
-                        "agent.neo4j.password=autotest123456")
+                        "agent.neo4j.password=autotest123456",
+                        "agent.maintenance.enabled=true",
+                        "agent.maintenance.episode-retention-days=90",
+                        "agent.maintenance.candidate-retention-days=7")
                 .run(ctx -> {
                     AgentProperties props = ctx.getBean(AgentProperties.class);
                     assertEquals("bge-m3", props.getEmbedding().getModel());
@@ -39,6 +42,8 @@ class AgentPropertiesTest {
                     assertEquals(40, props.getDistill().getMinCharacters());
                     assertEquals("bolt://127.0.0.1:7687", props.getNeo4j().getUri());
                     assertEquals("neo4j", props.getNeo4j().getUser());
+                    assertEquals(90, props.getMaintenance().getEpisodeRetentionDays());
+                    assertEquals(7, props.getMaintenance().getCandidateRetentionDays());
                 });
     }
 }
