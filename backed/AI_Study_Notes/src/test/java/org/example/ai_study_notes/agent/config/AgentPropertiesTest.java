@@ -25,7 +25,10 @@ class AgentPropertiesTest {
                         "agent.qdrant.host=127.0.0.1",
                         "agent.qdrant.port=6334",
                         "agent.distill.enabled=false",
-                        "agent.distill.min-characters=40")
+                        "agent.distill.min-characters=40",
+                        "agent.neo4j.uri=bolt://127.0.0.1:7687",
+                        "agent.neo4j.user=neo4j",
+                        "agent.neo4j.password=autotest123456")
                 .run(ctx -> {
                     AgentProperties props = ctx.getBean(AgentProperties.class);
                     assertEquals("bge-m3", props.getEmbedding().getModel());
@@ -34,6 +37,8 @@ class AgentPropertiesTest {
                     assertEquals(6334, props.getQdrant().getPort());
                     assertEquals(false, props.getDistill().isEnabled());
                     assertEquals(40, props.getDistill().getMinCharacters());
+                    assertEquals("bolt://127.0.0.1:7687", props.getNeo4j().getUri());
+                    assertEquals("neo4j", props.getNeo4j().getUser());
                 });
     }
 }

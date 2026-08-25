@@ -204,6 +204,13 @@
             <version>1.65.1</version>
         </dependency>
 
+        <!-- Neo4j 关系图 -->
+        <dependency>
+            <groupId>org.neo4j.driver</groupId>
+            <artifactId>neo4j-java-driver</artifactId>
+            <version>5.26.0</version>
+        </dependency>
+
     </dependencies>
 
     <dependencyManagement>

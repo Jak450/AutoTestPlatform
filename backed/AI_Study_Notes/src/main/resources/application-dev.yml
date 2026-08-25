@@ -77,3 +77,7 @@ agent:
   distill:
     enabled: ${DISTILL_ENABLED:true}
     min-characters: 60
+  neo4j:
+    uri: ${NEO4J_URI:bolt://127.0.0.1:7687}
+    user: ${NEO4J_USER:neo4j}
+    password: ${NEO4J_PASSWORD:autotest123456}

@@ -19,6 +19,7 @@ public class AgentProperties {
     private Embedding embedding = new Embedding();
     private Qdrant qdrant = new Qdrant();
     private Distill distill = new Distill();
+    private Neo4j neo4j = new Neo4j();
 
     @Data
     public static class DeepSeek {
@@ -69,5 +70,12 @@ public class AgentProperties {
     public static class Distill {
         private boolean enabled = true;
         private int minCharacters = 60;
+    }
+
+    @Data
+    public static class Neo4j {
+        private String uri = "bolt://127.0.0.1:7687";
+        private String user = "neo4j";
+        private String password = "autotest123456";
     }
 }
