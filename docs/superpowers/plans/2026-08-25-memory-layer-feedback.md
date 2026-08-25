@@ -653,3 +653,11 @@ git commit -m "chore(memory): 记忆系统全量验证"
 - **类型一致性**：`MemoryDistiller` 构造参数在测试与实现一致；`ReviewFeedbackService.recordFeedback(userId, taskType, gap, sourceRef)` 在 Service/Controller/Test 一致；`QdrantVectorStore.collectionName` 在 Store/Indexer/IT 一致。
 - **分层/DRY**：Job 只做调度+数据操作；反馈服务只组装；Distiller 单一入口；删除旧代码时同步删引用，无死引用。
 - **清理边界（方案 A）**：`agent_memory` 表与 `MemoryController` 保留（前端资源面板依赖）；旧 AI 模块（`ai.ark.*`）不在范围。
+
+## 执行记录（2026-08-25，与计划的偏差）
+
+- 删除旧 `MemoryExtractor` 后，其专属测试 `MemoryExtractorTest` 一并删除（逻辑已由 MemoryDistillerTest 覆盖）。
+- `ToolExecutionService` 构造函数追加 `EpisodeRecorder`，既有 `ToolExecutionIdempotencyTest` 同步补 mock 参数。
+- Mockito 对 double 基本类型需用 `anyDouble()`（ReviewFeedbackServiceTest 中 `saveCandidate` 的 confidence 参数）。
+- `QdrantVectorStore.collectionName` 引入后，`MemoryIndexer`/`MemoryRetriever` 与三个相关测试同步改为经 `collectionName(...)` 取值；mock 需 stub `collectionName` 返回原参。
+- 运行集成测试需 Redis 在跑（`AnnotationToolScannerIT` 的 `list_all_projects` 依赖）。
