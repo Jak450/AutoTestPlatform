@@ -7,6 +7,9 @@ import org.example.ai_study_notes.agent.memory.episode.MemoryEpisode;
 import org.example.ai_study_notes.agent.memory.episode.MemoryEpisodeMapper;
 import org.example.ai_study_notes.agent.memory.experience.MemoryExperience;
 import org.example.ai_study_notes.agent.memory.experience.MemoryExperienceMapper;
+import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
+import org.example.ai_study_notes.agent.memory.fact.MemoryFactMapper;
+import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +25,19 @@ public class MemoryMaintenanceJob {
     private final AgentProperties properties;
     private final MemoryEpisodeMapper episodeMapper;
     private final MemoryExperienceMapper experienceMapper;
+    private final MemoryFactMapper factMapper;
+    private final QdrantVectorStore vectorStore;
 
     public MemoryMaintenanceJob(AgentProperties properties,
                                 MemoryEpisodeMapper episodeMapper,
-                                MemoryExperienceMapper experienceMapper) {
+                                MemoryExperienceMapper experienceMapper,
+                                MemoryFactMapper factMapper,
+                                QdrantVectorStore vectorStore) {
         this.properties = properties;
         this.episodeMapper = episodeMapper;
         this.experienceMapper = experienceMapper;
+        this.factMapper = factMapper;
+        this.vectorStore = vectorStore;
     }
 
     @Scheduled(fixedDelayString = "${agent.maintenance.interval-ms:3600000}")
@@ -39,7 +48,9 @@ public class MemoryMaintenanceJob {
         try {
             int archived = archiveEpisodes();
             int expired = expireCandidates();
-            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条", archived, expired);
+            int factVectors = archiveArchivedFactVectors();
+            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条，清理归档事实向量 {} 条",
+                    archived, expired, factVectors);
         } catch (Exception e) {
             log.warn("记忆维护失败: {}", e.getMessage());
         }
@@ -68,10 +79,19 @@ public class MemoryMaintenanceJob {
         var candidates = experienceMapper.selectList(new LambdaQueryWrapper<MemoryExperience>()
                 .eq(MemoryExperience::getConfirmed, 0)
                 .lt(MemoryExperience::getCreatedAt, cutoff));
-        int count = candidates.size();
         for (MemoryExperience candidate : candidates) {
             experienceMapper.deleteById(candidate.getId());
         }
-        return count;
+        vectorStore.deleteByIds(vectorStore.collectionName(QdrantVectorStore.COLLECTION_EXPERIENCES),
+                candidates.stream().map(c -> "experience:" + c.getId()).toList());
+        return candidates.size();
+    }
+
+    private int archiveArchivedFactVectors() {
+        var archived = factMapper.selectList(new LambdaQueryWrapper<MemoryFact>()
+                .ne(MemoryFact::getValidTo, FactMemoryService.OPEN_END));
+        vectorStore.deleteByIds(vectorStore.collectionName(QdrantVectorStore.COLLECTION_FACTS),
+                archived.stream().map(f -> "fact:" + f.getId()).toList());
+        return archived.size();
     }
 }

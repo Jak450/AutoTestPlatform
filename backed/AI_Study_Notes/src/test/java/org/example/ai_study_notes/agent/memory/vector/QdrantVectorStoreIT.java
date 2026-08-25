@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("integration")
 class QdrantVectorStoreIT {
@@ -48,6 +49,15 @@ class QdrantVectorStoreIT {
                 store.search(store.collectionName("experiences"), List.of(0.9f, 0.1f, 0f, 0f), "1", true, 2);
         assertEquals(1, hits.size());
         assertEquals("e1", hits.get(0).id());
+    }
+
+    @Test
+    void deleteByIdsRemovesPoints() {
+        String col = store.collectionName("facts");
+        store.upsert(col, "d1", List.of(1f, 0f, 0f, 0f), Map.of("workspace_id", "1"));
+        store.deleteByIds(col, List.of("d1"));
+        List<QdrantVectorStore.Hit> hits = store.search(col, List.of(1f, 0f, 0f, 0f), "1", null, 2);
+        assertTrue(hits.stream().noneMatch(h -> h.id().equals("d1")));
     }
 
     private boolean isQdrantUp() {

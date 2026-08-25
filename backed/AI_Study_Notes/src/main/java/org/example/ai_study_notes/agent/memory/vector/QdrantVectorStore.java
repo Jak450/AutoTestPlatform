@@ -11,6 +11,7 @@ import io.qdrant.client.grpc.Points.Condition;
 import io.qdrant.client.grpc.Points.FieldCondition;
 import io.qdrant.client.grpc.Points.Filter;
 import io.qdrant.client.grpc.Points.Match;
+import io.qdrant.client.grpc.Points.PointId;
 import io.qdrant.client.grpc.Points.PointStruct;
 import io.qdrant.client.grpc.Points.ScoredPoint;
 import io.qdrant.client.grpc.Points.SearchPoints;
@@ -91,6 +92,21 @@ public class QdrantVectorStore {
             client.upsertAsync(collection, List.of(point)).get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             throw new IllegalStateException("Qdrant upsert 失败: " + e.getMessage(), e);
+        }
+    }
+
+    public void deleteByIds(String collection, List<String> pointIds) {
+        if (pointIds == null || pointIds.isEmpty()) {
+            return;
+        }
+        try {
+            List<PointId> ids = pointIds.stream()
+                    .map(id -> PointIdFactory.id(UUID.nameUUIDFromBytes(
+                            id.getBytes(StandardCharsets.UTF_8))))
+                    .toList();
+            client.deleteAsync(collection, ids).get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IllegalStateException("Qdrant delete 失败: " + e.getMessage(), e);
         }
     }
 
