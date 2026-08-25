@@ -386,6 +386,9 @@ public class AgentLoop {
         if (injection.knowledge() != null && !injection.knowledge().isBlank()) {
             sb.append("### 知识\n").append(injection.knowledge());
         }
+        if (injection.relations() != null && !injection.relations().isBlank()) {
+            sb.append("### 关系\n").append(injection.relations());
+        }
         return sb.toString();
     }
 

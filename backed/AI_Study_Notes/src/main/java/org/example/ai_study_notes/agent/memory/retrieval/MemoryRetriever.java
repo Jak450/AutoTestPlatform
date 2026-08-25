@@ -6,6 +6,7 @@ import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
 import org.example.ai_study_notes.agent.memory.embedding.EmbeddingClient;
+import org.example.ai_study_notes.agent.memory.graph.GraphRetriever;
 import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +27,7 @@ public class MemoryRetriever {
     public record RankedItem(String type, String id, String content, double score) {
     }
 
-    public record MemoryInjection(String facts, String experiences, String knowledge) {
+    public record MemoryInjection(String facts, String experiences, String knowledge, String relations) {
     }
 
     private final FactMemoryService factService;
@@ -34,17 +35,20 @@ public class MemoryRetriever {
     private final KnowledgeService knowledgeService;
     private final EmbeddingClient embeddingClient;
     private final QdrantVectorStore vectorStore;
+    private final GraphRetriever graphRetriever;
 
     public MemoryRetriever(FactMemoryService factService,
                            ExperienceMemoryService experienceService,
                            KnowledgeService knowledgeService,
                            EmbeddingClient embeddingClient,
-                           QdrantVectorStore vectorStore) {
+                           QdrantVectorStore vectorStore,
+                           GraphRetriever graphRetriever) {
         this.factService = factService;
         this.experienceService = experienceService;
         this.knowledgeService = knowledgeService;
         this.embeddingClient = embeddingClient;
         this.vectorStore = vectorStore;
+        this.graphRetriever = graphRetriever;
     }
 
     public List<RankedItem> retrieve(Long workspaceId, Long userId, String query, int topK) {
@@ -104,7 +108,8 @@ public class MemoryRetriever {
         String facts = InjectionAssembler.assemble(scores, content, third, factMust);
         String experiences = InjectionAssembler.assemble(scores, content, third, List.of());
         String knowledge = InjectionAssembler.assemble(scores, content, third, List.of());
-        return new MemoryInjection(facts, experiences, knowledge);
+        String relations = graphRetriever.expandForQuery(query, workspaceId, third);
+        return new MemoryInjection(facts, experiences, knowledge, relations);
     }
 
     private void addVectorRoute(List<List<String>> rankedIds, Map<String, RankedItem> byId,

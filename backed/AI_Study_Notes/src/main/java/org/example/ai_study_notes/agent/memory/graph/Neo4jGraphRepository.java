@@ -88,6 +88,18 @@ public class Neo4jGraphRepository {
         }
     }
 
+    public List<String> findEntityIdsByQuery(String query, Long workspaceId) {
+        try (var session = driver.session()) {
+            var result = session.run("""
+                    MATCH (e:Entity {workspaceId: $workspaceId})
+                    WHERE $query CONTAINS e.name
+                       OR any(a IN e.aliases WHERE $query CONTAINS a)
+                    RETURN e.entityId AS entityId LIMIT 5
+                    """, Map.of("query", query, "workspaceId", workspaceId));
+            return result.list(record -> record.get("entityId").asString());
+        }
+    }
+
     public List<RelationHit> expand(String entityId, Long workspaceId, int depth) {
         List<RelationHit> hits = expandOnce(entityId, workspaceId);
         if (depth >= 2) {

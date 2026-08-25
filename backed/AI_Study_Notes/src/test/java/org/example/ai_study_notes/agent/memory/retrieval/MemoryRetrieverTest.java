@@ -5,6 +5,7 @@ import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
 import org.example.ai_study_notes.agent.memory.embedding.EmbeddingClient;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
+import org.example.ai_study_notes.agent.memory.graph.GraphRetriever;
 import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.junit.jupiter.api.Test;
 
@@ -33,9 +34,10 @@ class MemoryRetrieverTest {
         when(experienceService.searchConfirmedKeyword(eq(1L), anyString())).thenReturn(List.of());
         KnowledgeService knowledge = mock(KnowledgeService.class);
         when(knowledge.search(any(), any(), anyInt())).thenReturn(List.of());
+        GraphRetriever graphRetriever = mock(GraphRetriever.class);
 
         MemoryRetriever retriever = new MemoryRetriever(
-                factService, experienceService, knowledge, embedding, store);
+                factService, experienceService, knowledge, embedding, store, graphRetriever);
         List<MemoryRetriever.RankedItem> items = retriever.retrieve(1L, 1L, "鞋子价格", 5);
 
         assertFalse(items.isEmpty());
@@ -59,9 +61,10 @@ class MemoryRetrieverTest {
         when(experienceService.searchConfirmedKeyword(eq(1L), anyString())).thenReturn(List.of());
         KnowledgeService knowledge = mock(KnowledgeService.class);
         when(knowledge.search(any(), any(), anyInt())).thenReturn(List.of());
+        GraphRetriever graphRetriever = mock(GraphRetriever.class);
 
         MemoryRetriever retriever = new MemoryRetriever(
-                factService, experienceService, knowledge, embedding, store);
+                factService, experienceService, knowledge, embedding, store, graphRetriever);
         List<MemoryRetriever.RankedItem> items = retriever.retrieve(1L, 1L, "鞋子价格", 5);
 
         assertFalse(items.isEmpty());
