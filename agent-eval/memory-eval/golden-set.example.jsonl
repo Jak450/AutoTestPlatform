@@ -1,0 +1,3 @@
+{"query": "鞋子价格", "expected": ["fact:1"], "scenario": "fact"}
+{"query": "提取测试点时要注意什么", "expected": ["experience:2"], "scenario": "experience"}
+{"query": "购物模块需求分析", "expected": ["knowledge:shopping-requirement"], "scenario": "knowledge"}
