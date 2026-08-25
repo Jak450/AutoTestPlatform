@@ -789,3 +789,10 @@ git commit -m "chore(memory): 会话式确认全量验证"
 - **占位符**：无 TBD/TODO；代码步骤完整。
 - **类型一致性**：`PendingConfirmationService` 的 confirm/reject/correct 方法与 `ConfirmationAnswerProcessor` 调用一致；`Neo4jGraphRepository` 新方法与 IT/Service 一致；`MemoryDistiller` 偏好改道后测试断言同步。
 - **分层/DRY**：确认服务只做组装；处理器只做解析；维护任务只做调度；前端只删不改结构。
+
+## 执行记录（2026-08-25，与计划的偏差）
+
+- 删除 `agent_memory` 旧链路时发现 `KnowledgeMigration`（启动时把旧偏好迁到知识库的一次性迁移）同样依赖 `MemoryMapper/MemoryEntry`，一并删除（死代码）；其专属测试 `MemoryServiceTest` 同步删除。
+- `init.sql` 实际路径为 `backed/init.sql`（非 `backed/AI_Study_Notes/init.sql`）。
+- `ConfirmationAnswerProcessor` 采用"经验优先、无则关系"的回落实现：confirm/reject/correct 方法返回 boolean，经验无待确认项时自动转向关系；测试仍按计划验证经验路径。
+- 端到端冒烟（Task 5 Step 2）按计划为可选，本轮以单元+集成+打包全绿替代实弹冒烟。
