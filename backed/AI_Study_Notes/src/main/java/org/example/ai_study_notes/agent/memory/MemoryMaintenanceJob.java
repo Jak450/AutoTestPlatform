@@ -10,6 +10,7 @@ import org.example.ai_study_notes.agent.memory.experience.MemoryExperienceMapper
 import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFactMapper;
 import org.example.ai_study_notes.agent.memory.graph.Neo4jGraphRepository;
+import org.example.ai_study_notes.agent.memory.vector.MemoryIndexer;
 import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,19 +30,25 @@ public class MemoryMaintenanceJob {
     private final MemoryFactMapper factMapper;
     private final QdrantVectorStore vectorStore;
     private final Neo4jGraphRepository graphRepository;
+    private final ExperienceMemoryService experienceService;
+    private final MemoryIndexer indexer;
 
     public MemoryMaintenanceJob(AgentProperties properties,
                                 MemoryEpisodeMapper episodeMapper,
                                 MemoryExperienceMapper experienceMapper,
                                 MemoryFactMapper factMapper,
                                 QdrantVectorStore vectorStore,
-                                Neo4jGraphRepository graphRepository) {
+                                Neo4jGraphRepository graphRepository,
+                                ExperienceMemoryService experienceService,
+                                MemoryIndexer indexer) {
         this.properties = properties;
         this.episodeMapper = episodeMapper;
         this.experienceMapper = experienceMapper;
         this.factMapper = factMapper;
         this.vectorStore = vectorStore;
         this.graphRepository = graphRepository;
+        this.experienceService = experienceService;
+        this.indexer = indexer;
     }
 
     @Scheduled(fixedDelayString = "${agent.maintenance.interval-ms:3600000}")
@@ -54,9 +61,11 @@ public class MemoryMaintenanceJob {
             int expired = expireCandidates();
             int factVectors = archiveArchivedFactVectors();
             graphRepository.decayUnconfirmedRelations(30, 0.9, 0.2);
-            graphRepository.confirmUnconfirmedRelationsOlderThan(24);
-            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条，清理归档事实向量 {} 条，关系衰减/超时确认已执行",
-                    archived, expired, factVectors);
+            graphRepository.confirmUnconfirmedRelationsOlderThan(
+                    properties.getConfirm().getWindowHours());
+            int autoConfirmed = autoConfirmExpiredExperiences();
+            log.info("记忆维护完成：归档情景 {} 条，清理候选 {} 条，清理归档事实向量 {} 条，超时自动确认经验 {} 条",
+                    archived, expired, factVectors, autoConfirmed);
         } catch (Exception e) {
             log.warn("记忆维护失败: {}", e.getMessage());
         }
@@ -99,5 +108,19 @@ public class MemoryMaintenanceJob {
         vectorStore.deleteByIds(vectorStore.collectionName(QdrantVectorStore.COLLECTION_FACTS),
                 archived.stream().map(f -> "fact:" + f.getId()).toList());
         return archived.size();
+    }
+
+    private int autoConfirmExpiredExperiences() {
+        LocalDateTime cutoff = LocalDateTime.now()
+                .minusHours(properties.getConfirm().getWindowHours());
+        var candidates = experienceMapper.selectList(new LambdaQueryWrapper<MemoryExperience>()
+                .eq(MemoryExperience::getConfirmed, 0)
+                .lt(MemoryExperience::getCreatedAt, cutoff));
+        for (MemoryExperience candidate : candidates) {
+            experienceService.confirm(candidate.getId());
+            candidate.setConfirmed(1);
+            indexer.indexExperience(candidate);
+        }
+        return candidates.size();
     }
 }

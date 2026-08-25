@@ -87,3 +87,7 @@ agent:
     interval-ms: 3600000
     episode-retention-days: 90
     candidate-retention-days: 7
+  confirm:
+    enabled: ${CONFIRM_ENABLED:true}
+    window-hours: 24
+    ask-limit: 5

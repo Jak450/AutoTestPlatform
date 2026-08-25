@@ -21,6 +21,7 @@ public class AgentProperties {
     private Distill distill = new Distill();
     private Neo4j neo4j = new Neo4j();
     private Maintenance maintenance = new Maintenance();
+    private Confirm confirm = new Confirm();
 
     @Data
     public static class DeepSeek {
@@ -87,5 +88,12 @@ public class AgentProperties {
         private long intervalMs = 3_600_000;
         private int episodeRetentionDays = 90;
         private int candidateRetentionDays = 7;
+    }
+
+    @Data
+    public static class Confirm {
+        private boolean enabled = true;
+        private int windowHours = 24;
+        private int askLimit = 5;
     }
 }

@@ -31,7 +31,9 @@ class AgentPropertiesTest {
                         "agent.neo4j.password=autotest123456",
                         "agent.maintenance.enabled=true",
                         "agent.maintenance.episode-retention-days=90",
-                        "agent.maintenance.candidate-retention-days=7")
+                        "agent.maintenance.candidate-retention-days=7",
+                        "agent.confirm.window-hours=24",
+                        "agent.confirm.ask-limit=5")
                 .run(ctx -> {
                     AgentProperties props = ctx.getBean(AgentProperties.class);
                     assertEquals("bge-m3", props.getEmbedding().getModel());
@@ -44,6 +46,8 @@ class AgentPropertiesTest {
                     assertEquals("neo4j", props.getNeo4j().getUser());
                     assertEquals(90, props.getMaintenance().getEpisodeRetentionDays());
                     assertEquals(7, props.getMaintenance().getCandidateRetentionDays());
+                    assertEquals(24, props.getConfirm().getWindowHours());
+                    assertEquals(5, props.getConfirm().getAskLimit());
                 });
     }
 }

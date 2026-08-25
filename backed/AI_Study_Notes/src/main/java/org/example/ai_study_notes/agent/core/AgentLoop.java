@@ -14,6 +14,9 @@ import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
 import org.example.ai_study_notes.agent.memory.retrieval.MemoryRetriever;
 import org.example.ai_study_notes.agent.memory.distill.MemoryDistiller;
+import org.example.ai_study_notes.agent.memory.confirm.CompletionDetector;
+import org.example.ai_study_notes.agent.memory.confirm.ConfirmationAnswerProcessor;
+import org.example.ai_study_notes.agent.memory.confirm.PendingConfirmationService;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
 import org.example.ai_study_notes.agent.session.MessageService;
@@ -60,6 +63,9 @@ public class AgentLoop {
     private final TaskPlanService taskPlanService;
     private final ObjectMapper objectMapper;
     private final AgentProperties properties;
+    private final CompletionDetector completionDetector;
+    private final ConfirmationAnswerProcessor confirmationAnswerProcessor;
+    private final PendingConfirmationService pendingConfirmationService;
 
     public AgentLoop(AgentLlmClient llmClient,
                      ToolRegistry toolRegistry,
@@ -78,7 +84,10 @@ public class AgentLoop {
                      RunRegistry runRegistry,
                      TaskPlanService taskPlanService,
                      ObjectMapper objectMapper,
-                     AgentProperties properties) {
+                     AgentProperties properties,
+                     CompletionDetector completionDetector,
+                     ConfirmationAnswerProcessor confirmationAnswerProcessor,
+                     PendingConfirmationService pendingConfirmationService) {
         this.llmClient = llmClient;
         this.toolRegistry = toolRegistry;
         this.toolExecutionService = toolExecutionService;
@@ -97,6 +106,9 @@ public class AgentLoop {
         this.taskPlanService = taskPlanService;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.completionDetector = completionDetector;
+        this.confirmationAnswerProcessor = confirmationAnswerProcessor;
+        this.pendingConfirmationService = pendingConfirmationService;
     }
 
     /**
@@ -117,8 +129,13 @@ public class AgentLoop {
                         "messageId", userMessage.getId(), "delta", userText, "role", "user", "type", "text"));
                 stream.emit(EventType.MESSAGE_END.value(), Map.of("messageId", userMessage.getId()));
             }
+            if (userText != null) {
+                confirmationAnswerProcessor.process(userId, userText);
+            }
+            boolean completionSignal = userText != null
+                    && completionDetector.isCompletionSignal(userText);
             int[] tokenAcc = {0};
-            StopReason stopReason = loop(conversationId, userId, stream, runId, tokenAcc);
+            StopReason stopReason = loop(conversationId, userId, stream, runId, tokenAcc, completionSignal);
             stream.emit(EventType.AGENT_END.value(), Map.of(
                     "runId", runId, "conversationId", conversationId,
                     "stopReason", stopReason.value(), "tokens", tokenAcc[0]));
@@ -140,7 +157,7 @@ public class AgentLoop {
     }
 
     private StopReason loop(Long conversationId, Long userId, ConversationEventStream stream,
-                            String runId, int[] tokenAcc) {
+                            String runId, int[] tokenAcc, boolean completionSignal) {
         if (contextCompactor.needsCompaction(conversationId)) {
             log.info("会话 {} 触发自动压缩", conversationId);
             contextCompactor.compact(conversationId);
@@ -160,9 +177,17 @@ public class AgentLoop {
                 : taskPlanService.injectable(userId, conversationId);
         List<String> skillBodies = skillService.activeSkills(conversationId).stream()
                 .map(AgentSkill::getBody).toList();
+        String systemContent = systemPromptBuilder.buildWithMemory(memorySection, skillBodies, taskPlan);
+        if (userId != null && completionSignal) {
+            String pendingPrompt = pendingConfirmationService.pendingPrompt(
+                    userId, properties.getConfirm().getAskLimit());
+            if (!pendingPrompt.isBlank()) {
+                systemContent += "\n\n" + pendingPrompt;
+            }
+        }
         messages.add(LlmMessage.builder()
                 .role("system")
-                .content(systemPromptBuilder.buildWithMemory(memorySection, skillBodies, taskPlan))
+                .content(systemContent)
                 .build());
         messages.addAll(contextAssembler.toLlmMessages(conversationId));
 
