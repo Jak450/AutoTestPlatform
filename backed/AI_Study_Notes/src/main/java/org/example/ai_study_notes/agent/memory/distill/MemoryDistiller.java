@@ -8,7 +8,6 @@ import org.example.ai_study_notes.agent.core.AgentAiClient;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
 import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
-import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.example.ai_study_notes.agent.memory.episode.EpisodeRecorder;
 import org.example.ai_study_notes.agent.memory.experience.MemoryExperience;
 import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
@@ -47,7 +46,6 @@ public class MemoryDistiller {
     private final AgentAiClient aiClient;
     private final FactMemoryService factService;
     private final ExperienceMemoryService experienceService;
-    private final MemoryService memoryService;
     private final KnowledgeService knowledgeService;
     private final MemoryIndexer indexer;
     private final EpisodeRecorder episodeRecorder;
@@ -59,12 +57,10 @@ public class MemoryDistiller {
     public MemoryDistiller(AgentAiClient aiClient, FactMemoryService factService,
                            ExperienceMemoryService experienceService, MemoryIndexer indexer,
                            EpisodeRecorder episodeRecorder, MessageService messageService,
-                           AgentProperties properties, MemoryService memoryService,
-                           KnowledgeService knowledgeService) {
+                           AgentProperties properties, KnowledgeService knowledgeService) {
         this.aiClient = aiClient;
         this.factService = factService;
         this.experienceService = experienceService;
-        this.memoryService = memoryService;
         this.knowledgeService = knowledgeService;
         this.indexer = indexer;
         this.episodeRecorder = episodeRecorder;
@@ -108,7 +104,8 @@ public class MemoryDistiller {
                 if (key.isBlank() || content.isBlank()) {
                     continue;
                 }
-                memoryService.save(userId, key, content, List.of("auto"), false, conversationId);
+                factService.upsert(userId, userId, "user", key, content,
+                        "conversation", String.valueOf(conversationId), 0.9);
             }
             for (Object item : list(result, "knowledge")) {
                 Map<String, Object> k = cast(item);

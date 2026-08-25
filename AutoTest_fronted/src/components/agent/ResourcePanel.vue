@@ -12,20 +12,6 @@
       <p v-else class="rp-empty">暂无模板</p>
     </div>
     <div class="rp-group">
-      <div class="rp-group-title mono">记忆</div>
-      <div v-if="memories.length" class="rp-item" v-for="m in memories" :key="m.id || m.key">
-        <div class="rp-memory-line">
-          <span>{{ m.key }}</span>
-          <el-tag v-if="m.confirmed === 0" size="small" type="warning">待确认</el-tag>
-        </div>
-        <p v-if="m.content" class="rp-snippet">{{ m.content }}</p>
-        <el-button v-if="m.confirmed === 0" size="small" type="primary" plain @click="$emit('confirm-memory', m)">
-          确认
-        </el-button>
-      </div>
-      <p v-else class="rp-empty">暂无记忆</p>
-    </div>
-    <div class="rp-group">
       <div class="rp-group-title mono">知识</div>
       <div v-if="knowledgeGroups.length" class="rp-cat-block" v-for="g in knowledgeGroups" :key="g.category">
         <div class="rp-cat-head mono">{{ g.category }} <span class="rp-count">{{ g.items.length }}</span></div>
@@ -62,10 +48,9 @@ export default {
   props: {
     files: { type: Array, default: () => [] },
     templates: { type: Array, default: () => [] },
-    memories: { type: Array, default: () => [] },
     knowledgeDocs: { type: Array, default: () => [] }
   },
-  emits: ['confirm-memory', 'confirm-knowledge'],
+  emits: ['confirm-knowledge'],
   computed: {
     knowledgeGroups() {
       const groups = {}

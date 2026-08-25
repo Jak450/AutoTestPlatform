@@ -5,7 +5,6 @@ import org.example.ai_study_notes.agent.core.AgentAiClient;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
 import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
-import org.example.ai_study_notes.agent.memory.MemoryService;
 import org.example.ai_study_notes.agent.memory.episode.EpisodeRecorder;
 import org.example.ai_study_notes.agent.memory.vector.MemoryIndexer;
 import org.example.ai_study_notes.agent.session.AgentMessage;
@@ -40,11 +39,10 @@ class MemoryDistillerTest {
                         .content("鞋子多少钱，提取测试点时要考虑兼容性").build()));
         AgentProperties properties = new AgentProperties();
         properties.getDistill().setMinCharacters(5);
-        MemoryService memoryService = mock(MemoryService.class);
         KnowledgeService knowledgeService = mock(KnowledgeService.class);
 
         MemoryDistiller distiller = new MemoryDistiller(aiClient, factService, experienceService,
-                indexer, recorder, messageService, properties, memoryService, knowledgeService);
+                indexer, recorder, messageService, properties, knowledgeService);
         distiller.extractIfNeeded(1L, 1L);
 
         verify(factService).upsert(any(), any(), anyString(), anyString(), anyString(), anyString(), anyString(), anyDouble());
@@ -68,14 +66,14 @@ class MemoryDistillerTest {
                         .content("默认环境用 staging，登录接口在并发下容易超时").build()));
         AgentProperties properties = new AgentProperties();
         properties.getDistill().setMinCharacters(5);
-        MemoryService memoryService = mock(MemoryService.class);
         KnowledgeService knowledgeService = mock(KnowledgeService.class);
 
         MemoryDistiller distiller = new MemoryDistiller(aiClient, factService, experienceService,
-                indexer, recorder, messageService, properties, memoryService, knowledgeService);
+                indexer, recorder, messageService, properties, knowledgeService);
         distiller.extractIfNeeded(1L, 1L);
 
-        verify(memoryService).save(eq(1L), eq("default_env"), eq("默认环境是 staging"), any(), any(), any());
+        verify(factService).upsert(eq(1L), eq(1L), eq("user"), eq("default_env"),
+                eq("默认环境是 staging"), anyString(), anyString(), anyDouble());
         verify(knowledgeService).saveCandidate(eq(1L), eq("登录接口超时"), eq("登录接口在并发下易超时"), any(), any());
     }
 }
