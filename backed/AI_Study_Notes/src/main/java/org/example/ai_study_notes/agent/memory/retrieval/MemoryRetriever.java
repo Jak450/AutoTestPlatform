@@ -1,5 +1,6 @@
 package org.example.ai_study_notes.agent.memory.retrieval;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.ai_study_notes.agent.knowledge.KnowledgeDoc;
 import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
@@ -19,6 +20,7 @@ import java.util.function.Function;
  * 业务层只依赖 Service 与仓储封装，不直接接触 Mapper。
  */
 @Service
+@Slf4j
 public class MemoryRetriever {
 
     public record RankedItem(String type, String id, String content, double score) {
@@ -46,21 +48,28 @@ public class MemoryRetriever {
     }
 
     public List<RankedItem> retrieve(Long workspaceId, Long userId, String query, int topK) {
-        List<Float> queryVec = embeddingClient.embed(query);
         List<List<String>> rankedIds = new ArrayList<>();
         Map<String, RankedItem> byId = new LinkedHashMap<>();
+        List<Float> queryVec = null;
+        try {
+            queryVec = embeddingClient.embed(query);
+        } catch (Exception e) {
+            log.warn("Embedding 不可用，降级为纯关键词检索: {}", e.getMessage());
+        }
+        if (queryVec != null) {
+            addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_FACTS, queryVec,
+                    workspaceId, null, "fact", topK * 2,
+                    hit -> "事实: " + hit.payload().getOrDefault("text", ""));
+            addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_EXPERIENCES, queryVec,
+                    workspaceId, true, "experience", topK * 2,
+                    hit -> "经验: " + hit.payload().getOrDefault("text", ""));
+        }
 
-        addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_FACTS, queryVec,
-                workspaceId, null, "fact", topK * 2,
-                hit -> "事实: " + hit.payload().getOrDefault("text", ""));
         addKeywordRoute(rankedIds, byId, factService.searchKeyword(workspaceId, query),
                 f -> "fact:" + f.getId(),
                 f -> new RankedItem("fact", String.valueOf(f.getId()),
                         "事实: " + f.getEntityId() + "." + f.getAttribute() + " = " + f.getFactValue(), 0.0));
 
-        addVectorRoute(rankedIds, byId, QdrantVectorStore.COLLECTION_EXPERIENCES, queryVec,
-                workspaceId, true, "experience", topK * 2,
-                hit -> "经验: " + hit.payload().getOrDefault("text", ""));
         addKeywordRoute(rankedIds, byId, experienceService.searchConfirmedKeyword(workspaceId, query),
                 e -> "experience:" + e.getId(),
                 e -> new RankedItem("experience", String.valueOf(e.getId()),

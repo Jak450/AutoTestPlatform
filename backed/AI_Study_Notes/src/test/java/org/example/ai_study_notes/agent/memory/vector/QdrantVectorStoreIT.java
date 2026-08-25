@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @Tag("integration")
@@ -34,6 +35,18 @@ class QdrantVectorStoreIT {
         store.upsert("facts", "f2", List.of(0f, 1f, 0f, 0f), Map.of("workspace_id", "1", "confirmed", 1));
         List<QdrantVectorStore.Hit> hits = store.search("facts", List.of(0.9f, 0.1f, 0f, 0f), "1", null, 2);
         assertFalse(hits.isEmpty());
+    }
+
+    @Test
+    void confirmedFilterMatchesIntegerPayload() {
+        store.upsert("experiences", "e1", List.of(1f, 0f, 0f, 0f),
+                Map.of("workspace_id", "1", "confirmed", 1));
+        store.upsert("experiences", "e2", List.of(0f, 1f, 0f, 0f),
+                Map.of("workspace_id", "1", "confirmed", 0));
+        List<QdrantVectorStore.Hit> hits =
+                store.search("experiences", List.of(0.9f, 0.1f, 0f, 0f), "1", true, 2);
+        assertEquals(1, hits.size());
+        assertEquals("e1", hits.get(0).id());
     }
 
     private boolean isQdrantUp() {

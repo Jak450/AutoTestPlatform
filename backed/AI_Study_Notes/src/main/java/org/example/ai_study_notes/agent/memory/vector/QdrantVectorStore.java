@@ -105,7 +105,7 @@ public class QdrantVectorStore {
             if (confirmedOnly != null && confirmedOnly) {
                 filter.addMust(Condition.newBuilder().setField(FieldCondition.newBuilder()
                         .setKey("confirmed")
-                        .setMatch(Match.newBuilder().setInteger(1))));
+                        .setMatch(Match.newBuilder().setInteger(1L))));
             }
             if (workspaceId != null || confirmedOnly != null) {
                 builder.setFilter(filter);
@@ -126,6 +126,8 @@ public class QdrantVectorStore {
         payload.forEach((k, v) -> {
             if (v instanceof String s) {
                 out.put(k, ValueFactory.value(s));
+            } else if (v instanceof Integer || v instanceof Long) {
+                out.put(k, ValueFactory.value(((Number) v).longValue()));
             } else if (v instanceof Number n) {
                 out.put(k, ValueFactory.value(n.doubleValue()));
             } else if (v instanceof Boolean b) {

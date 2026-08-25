@@ -4,6 +4,7 @@ import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
 import org.example.ai_study_notes.agent.memory.ExperienceMemoryService;
 import org.example.ai_study_notes.agent.memory.FactMemoryService;
 import org.example.ai_study_notes.agent.memory.embedding.EmbeddingClient;
+import org.example.ai_study_notes.agent.memory.fact.MemoryFact;
 import org.example.ai_study_notes.agent.memory.vector.QdrantVectorStore;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +20,28 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class MemoryRetrieverTest {
+
+    @Test
+    void embeddingFailureFallsBackToKeyword() {
+        EmbeddingClient embedding = mock(EmbeddingClient.class);
+        when(embedding.embed(anyString())).thenThrow(new IllegalStateException("embedding down"));
+        QdrantVectorStore store = mock(QdrantVectorStore.class);
+        FactMemoryService factService = mock(FactMemoryService.class);
+        when(factService.searchKeyword(eq(1L), anyString())).thenReturn(List.of(
+                MemoryFact.builder().id(7L).entityId("shoe").attribute("price").factValue("500").build()));
+        ExperienceMemoryService experienceService = mock(ExperienceMemoryService.class);
+        when(experienceService.searchConfirmedKeyword(eq(1L), anyString())).thenReturn(List.of());
+        KnowledgeService knowledge = mock(KnowledgeService.class);
+        when(knowledge.search(any(), any(), anyInt())).thenReturn(List.of());
+
+        MemoryRetriever retriever = new MemoryRetriever(
+                factService, experienceService, knowledge, embedding, store);
+        List<MemoryRetriever.RankedItem> items = retriever.retrieve(1L, 1L, "鞋子价格", 5);
+
+        assertFalse(items.isEmpty());
+        assertEquals("fact", items.get(0).type());
+        assertEquals("7", items.get(0).id());
+    }
 
     @Test
     void retrieveFusesVectorAndKeywordRanks() {
