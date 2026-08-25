@@ -66,9 +66,9 @@ agent:
     max-turns: 20
     timeout-seconds: 300
   embedding:
-    base-url: ${EMBEDDING_BASE_URL:http://127.0.0.1:11434/v1}
+    base-url: ${EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
     api-key: ${EMBEDDING_API_KEY:}
-    model: ${EMBEDDING_MODEL:bge-m3}
+    model: ${EMBEDDING_MODEL:BAAI/bge-m3}
     dimensions: 1024
   qdrant:
     host: ${QDRANT_HOST:127.0.0.1}
