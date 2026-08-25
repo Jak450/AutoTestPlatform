@@ -13,6 +13,7 @@ import org.example.ai_study_notes.agent.context.ContextCompactor;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
 import org.example.ai_study_notes.agent.memory.retrieval.MemoryRetriever;
+import org.example.ai_study_notes.agent.memory.distill.MemoryDistiller;
 import org.example.ai_study_notes.agent.memory.MemoryExtractor;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
@@ -52,6 +53,7 @@ public class AgentLoop {
     private final ContextAssembler contextAssembler;
     private final SystemPromptBuilder systemPromptBuilder;
     private final MemoryRetriever memoryRetriever;
+    private final MemoryDistiller memoryDistiller;
     private final ContextCompactor contextCompactor;
     private final MemoryExtractor memoryExtractor;
     private final SkillService skillService;
@@ -71,6 +73,7 @@ public class AgentLoop {
                      ContextAssembler contextAssembler,
                      SystemPromptBuilder systemPromptBuilder,
                      MemoryRetriever memoryRetriever,
+                     MemoryDistiller memoryDistiller,
                      ContextCompactor contextCompactor,
                      MemoryExtractor memoryExtractor,
                      SkillService skillService,
@@ -89,6 +92,7 @@ public class AgentLoop {
         this.contextAssembler = contextAssembler;
         this.systemPromptBuilder = systemPromptBuilder;
         this.memoryRetriever = memoryRetriever;
+        this.memoryDistiller = memoryDistiller;
         this.contextCompactor = contextCompactor;
         this.memoryExtractor = memoryExtractor;
         this.skillService = skillService;
@@ -126,6 +130,7 @@ public class AgentLoop {
                     Map.of("stopReason", stopReason.value(), "tokens", tokenAcc[0]));
             if (stopReason == StopReason.STOP) {
                 memoryExtractor.extractIfNeeded(conversationId, userId, historyTail(conversationId));
+                memoryDistiller.extractIfNeeded(conversationId, userId);
             }
         } catch (Exception e) {
             log.error("Agent run 失败 conversationId={}", conversationId, e);

@@ -23,13 +23,17 @@ class AgentPropertiesTest {
                         "agent.embedding.model=bge-m3",
                         "agent.embedding.dimensions=1024",
                         "agent.qdrant.host=127.0.0.1",
-                        "agent.qdrant.port=6334")
+                        "agent.qdrant.port=6334",
+                        "agent.distill.enabled=false",
+                        "agent.distill.min-characters=40")
                 .run(ctx -> {
                     AgentProperties props = ctx.getBean(AgentProperties.class);
                     assertEquals("bge-m3", props.getEmbedding().getModel());
                     assertEquals(1024, props.getEmbedding().getDimensions());
                     assertEquals("127.0.0.1", props.getQdrant().getHost());
                     assertEquals(6334, props.getQdrant().getPort());
+                    assertEquals(false, props.getDistill().isEnabled());
+                    assertEquals(40, props.getDistill().getMinCharacters());
                 });
     }
 }

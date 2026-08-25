@@ -18,6 +18,7 @@ public class AgentProperties {
     private String skillsDir = "";
     private Embedding embedding = new Embedding();
     private Qdrant qdrant = new Qdrant();
+    private Distill distill = new Distill();
 
     @Data
     public static class DeepSeek {
@@ -62,5 +63,11 @@ public class AgentProperties {
         private String host = "127.0.0.1";
         private int port = 6334;
         private String apiKey = "";
+    }
+
+    @Data
+    public static class Distill {
+        private boolean enabled = true;
+        private int minCharacters = 60;
     }
 }
