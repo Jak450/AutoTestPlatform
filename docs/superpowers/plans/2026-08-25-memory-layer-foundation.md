@@ -593,9 +593,9 @@ public class MemoryFact {
 package org.example.ai_study_notes.agent.memory.fact;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.annotations.Mapper;
+import org.springframework.stereotype.Repository;
 
-@Mapper
+@Repository
 public interface MemoryFactMapper extends BaseMapper<MemoryFact> {
 }
 ```
@@ -645,9 +645,9 @@ public class MemoryExperience {
 package org.example.ai_study_notes.agent.memory.experience;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.annotations.Mapper;
+import org.springframework.stereotype.Repository;
 
-@Mapper
+@Repository
 public interface MemoryExperienceMapper extends BaseMapper<MemoryExperience> {
 }
 ```
@@ -691,9 +691,9 @@ public class MemoryEpisode {
 package org.example.ai_study_notes.agent.memory.episode;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.annotations.Mapper;
+import org.springframework.stereotype.Repository;
 
-@Mapper
+@Repository
 public interface MemoryEpisodeMapper extends BaseMapper<MemoryEpisode> {
 }
 ```

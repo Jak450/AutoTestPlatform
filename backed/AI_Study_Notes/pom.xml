@@ -12,6 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-boot.version>3.2.5</spring-boot.version>
+        <surefire.excludedGroups>integration</surefire.excludedGroups>
     </properties>
     <dependencies>
         <!-- 核心依赖 -->
@@ -231,6 +232,15 @@
                 <configuration>
                     <reportDirectory>target/allure-report</reportDirectory>
                     <resultsDirectory>target/allure-results</resultsDirectory>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
