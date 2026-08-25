@@ -12,8 +12,7 @@ import org.example.ai_study_notes.agent.context.ContextAssembler;
 import org.example.ai_study_notes.agent.context.ContextCompactor;
 import org.example.ai_study_notes.agent.event.ConversationEventStream;
 import org.example.ai_study_notes.agent.event.EventStreamService;
-import org.example.ai_study_notes.agent.knowledge.KnowledgeService;
-import org.example.ai_study_notes.agent.memory.MemoryService;
+import org.example.ai_study_notes.agent.memory.retrieval.MemoryRetriever;
 import org.example.ai_study_notes.agent.memory.MemoryExtractor;
 import org.example.ai_study_notes.agent.session.AgentMessage;
 import org.example.ai_study_notes.agent.session.ConversationService;
@@ -52,13 +51,12 @@ public class AgentLoop {
     private final EventStreamService eventStreamService;
     private final ContextAssembler contextAssembler;
     private final SystemPromptBuilder systemPromptBuilder;
-    private final MemoryService memoryService;
+    private final MemoryRetriever memoryRetriever;
     private final ContextCompactor contextCompactor;
     private final MemoryExtractor memoryExtractor;
     private final SkillService skillService;
     private final AuditService auditService;
     private final RunRegistry runRegistry;
-    private final KnowledgeService knowledgeService;
     private final TaskPlanService taskPlanService;
     private final ObjectMapper objectMapper;
     private final AgentProperties properties;
@@ -72,13 +70,12 @@ public class AgentLoop {
                      EventStreamService eventStreamService,
                      ContextAssembler contextAssembler,
                      SystemPromptBuilder systemPromptBuilder,
-                     MemoryService memoryService,
+                     MemoryRetriever memoryRetriever,
                      ContextCompactor contextCompactor,
                      MemoryExtractor memoryExtractor,
                      SkillService skillService,
                      AuditService auditService,
                      RunRegistry runRegistry,
-                     KnowledgeService knowledgeService,
                      TaskPlanService taskPlanService,
                      ObjectMapper objectMapper,
                      AgentProperties properties) {
@@ -91,13 +88,12 @@ public class AgentLoop {
         this.eventStreamService = eventStreamService;
         this.contextAssembler = contextAssembler;
         this.systemPromptBuilder = systemPromptBuilder;
-        this.memoryService = memoryService;
+        this.memoryRetriever = memoryRetriever;
         this.contextCompactor = contextCompactor;
         this.memoryExtractor = memoryExtractor;
         this.skillService = skillService;
         this.auditService = auditService;
         this.runRegistry = runRegistry;
-        this.knowledgeService = knowledgeService;
         this.taskPlanService = taskPlanService;
         this.objectMapper = objectMapper;
         this.properties = properties;
@@ -150,17 +146,23 @@ public class AgentLoop {
             contextCompactor.compact(conversationId);
         }
         List<LlmMessage> messages = new ArrayList<>();
-        List<String> memories = userId == null ? java.util.List.of()
-                : memoryService.injectable(userId, memoryQuery(conversationId));
-        List<String> knowledge = userId == null ? java.util.List.of()
-                : knowledgeService.injectable(userId, memoryQuery(conversationId), 2048);
+        String memorySection = "";
+        if (userId != null) {
+            try {
+                MemoryRetriever.MemoryInjection injection = memoryRetriever.inject(
+                        userId, userId, memoryQuery(conversationId), 8192);
+                memorySection = formatInjection(injection);
+            } catch (Exception e) {
+                log.warn("记忆注入失败，降级为空: {}", e.getMessage());
+            }
+        }
         String taskPlan = userId == null ? ""
                 : taskPlanService.injectable(userId, conversationId);
         List<String> skillBodies = skillService.activeSkills(conversationId).stream()
                 .map(AgentSkill::getBody).toList();
         messages.add(LlmMessage.builder()
                 .role("system")
-                .content(systemPromptBuilder.build(memories, skillBodies, knowledge, taskPlan))
+                .content(systemPromptBuilder.buildWithMemory(memorySection, skillBodies, taskPlan))
                 .build());
         messages.addAll(contextAssembler.toLlmMessages(conversationId));
 
@@ -366,6 +368,20 @@ public class AgentLoop {
             log.warn("工具参数解析失败: {}", arguments);
             return new LinkedHashMap<>();
         }
+    }
+
+    private String formatInjection(MemoryRetriever.MemoryInjection injection) {
+        StringBuilder sb = new StringBuilder();
+        if (injection.facts() != null && !injection.facts().isBlank()) {
+            sb.append("### 事实\n").append(injection.facts());
+        }
+        if (injection.experiences() != null && !injection.experiences().isBlank()) {
+            sb.append("### 经验\n").append(injection.experiences());
+        }
+        if (injection.knowledge() != null && !injection.knowledge().isBlank()) {
+            sb.append("### 知识\n").append(injection.knowledge());
+        }
+        return sb.toString();
     }
 
     private String memoryQuery(Long conversationId) {
