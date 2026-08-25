@@ -16,6 +16,8 @@ public class AgentProperties {
     private Auth auth = new Auth();
     private String dataDir = "./agent-data";
     private String skillsDir = "";
+    private Embedding embedding = new Embedding();
+    private Qdrant qdrant = new Qdrant();
 
     @Data
     public static class DeepSeek {
@@ -44,5 +46,21 @@ public class AgentProperties {
     @Data
     public static class Auth {
         private String adminPassword = "12345678";
+    }
+
+    @Data
+    public static class Embedding {
+        private String baseUrl = "http://127.0.0.1:11434/v1";
+        private String apiKey = "";
+        private String model = "bge-m3";
+        private int dimensions = 1024;
+        private int timeoutSeconds = 60;
+    }
+
+    @Data
+    public static class Qdrant {
+        private String host = "127.0.0.1";
+        private int port = 6334;
+        private String apiKey = "";
     }
 }

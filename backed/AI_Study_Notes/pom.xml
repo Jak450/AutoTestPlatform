@@ -180,6 +180,12 @@
 <!--            <version>3.20.0</version>-->
 <!--        </dependency>-->
 
+        <!-- Qdrant 向量检索 -->
+        <dependency>
+            <groupId>io.qdrant</groupId>
+            <artifactId>client</artifactId>
+            <version>1.13.0</version>
+        </dependency>
 
     </dependencies>
 
