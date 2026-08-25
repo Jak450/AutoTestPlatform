@@ -6,6 +6,7 @@ import org.example.ai_study_notes.agent.contract.ToolPermission;
 import org.example.ai_study_notes.agent.contract.ToolResultMeta;
 import org.example.ai_study_notes.agent.execution.AgentToolExecution;
 import org.example.ai_study_notes.agent.execution.ToolExecutionMapper;
+import org.example.ai_study_notes.agent.memory.episode.EpisodeRecorder;
 import org.example.ai_study_notes.agent.middleware.MiddlewareChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class ToolExecutionIdempotencyTest {
         auditService = mock(AuditService.class);
         executionMapper = mock(ToolExecutionMapper.class);
         service = new ToolExecutionService(registry, schemaValidator, middlewareChain, auditService,
-                executionMapper, new ObjectMapper());
+                executionMapper, new ObjectMapper(), mock(EpisodeRecorder.class));
         invocations = new AtomicInteger();
         when(schemaValidator.validate(any(), any())).thenReturn(List.of());
         when(middlewareChain.before(anyString(), anyMap(), any())).thenReturn(Optional.empty());

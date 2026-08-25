@@ -8,6 +8,7 @@ import org.example.ai_study_notes.agent.contract.ToolPermission;
 import org.example.ai_study_notes.agent.contract.ToolResultMeta;
 import org.example.ai_study_notes.agent.execution.AgentToolExecution;
 import org.example.ai_study_notes.agent.execution.ToolExecutionMapper;
+import org.example.ai_study_notes.agent.memory.episode.EpisodeRecorder;
 import org.example.ai_study_notes.agent.middleware.MiddlewareChain;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -39,16 +40,19 @@ public class ToolExecutionService {
     private final AuditService auditService;
     private final ToolExecutionMapper executionMapper;
     private final ObjectMapper objectMapper;
+    private final EpisodeRecorder episodeRecorder;
 
     public ToolExecutionService(ToolRegistry registry, SchemaValidator schemaValidator,
                                 MiddlewareChain middlewareChain, AuditService auditService,
-                                ToolExecutionMapper executionMapper, ObjectMapper objectMapper) {
+                                ToolExecutionMapper executionMapper, ObjectMapper objectMapper,
+                                EpisodeRecorder episodeRecorder) {
         this.registry = registry;
         this.schemaValidator = schemaValidator;
         this.middlewareChain = middlewareChain;
         this.auditService = auditService;
         this.executionMapper = executionMapper;
         this.objectMapper = objectMapper;
+        this.episodeRecorder = episodeRecorder;
     }
 
     /**
@@ -63,15 +67,19 @@ public class ToolExecutionService {
             if (intercepted.isPresent()) {
                 return intercepted.get().withDuration(start);
             }
-            return ToolResult.unknownTool(toolName, start);
+            ToolResult result = ToolResult.unknownTool(toolName, start);
+            recordFailure(toolName, args, context, result);
+            return result;
         }
         List<String> errors = schemaValidator.validate(definition.getInputSchema(), args);
         if (!errors.isEmpty()) {
-            return ToolResult.error(toolName,
+            ToolResult result = ToolResult.error(toolName,
                     "参数校验失败: " + String.join("; ", errors),
                     ToolResultMeta.ErrorType.CONFIG,
                     ToolResultMeta.RecommendedNextAction.REWRITE_QUERY,
                     start);
+            recordFailure(toolName, args, context, result);
+            return result;
         }
         if (!confirmed && definition.getPermission().requiresConfirmation()) {
             return ToolResult.requiresConfirmation(toolName, args);
@@ -104,6 +112,7 @@ public class ToolExecutionService {
             result.setToolName(toolName);
             result.withDuration(start);
             middlewareChain.after(toolName, args, result, context);
+            recordFailure(toolName, args, context, result);
             finish(execution, result);
             audit(context, toolName, result);
             return result;
@@ -114,9 +123,29 @@ public class ToolExecutionService {
                     ToolResultMeta.ErrorType.INTERNAL,
                     ToolResultMeta.RecommendedNextAction.TRY_ALTERNATIVE,
                     start);
+            recordFailure(toolName, args, context, result);
             finish(execution, result);
             audit(context, toolName, result);
             return result;
+        }
+    }
+
+    private void recordFailure(String toolName, Map<String, Object> args,
+                               ToolContext context, ToolResult result) {
+        try {
+            if (result != null && ToolResultMeta.Status.ERROR.equals(result.getStatus())
+                    && context != null && context.getUserId() != null) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("tool", toolName);
+                detail.put("args", args);
+                detail.put("status", "error");
+                detail.put("message", result.getMessage());
+                episodeRecorder.record(context.getUserId(), context.getUserId(),
+                        "tool_result", "tool:" + toolName,
+                        objectMapper.writeValueAsString(detail));
+            }
+        } catch (Exception e) {
+            log.warn("工具失败记录失败: {}", e.getMessage());
         }
     }
 
